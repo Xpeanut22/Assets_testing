@@ -1,0 +1,13 @@
+{
+    "require": {
+        "phpoffice/phpspreadsheet": "^1.5"
+    },
+    "config": {
+        "allow-plugins": {
+            "kylekatarnls/update-helper": true
+        },
+        "platform": {
+            "php": "7.4"
+        }
+    }
+}
