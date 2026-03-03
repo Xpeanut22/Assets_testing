@@ -43,6 +43,13 @@
 
 								@endif
 
+								@if(Auth::check())
+
+								<p class="text-primary"><i class="ti-angle-right"></i><a href="{{ URL::to( 'typeofidlist') }}">Type of I.D</a> </p>
+								<hr>
+
+								@endif
+
 
 							</div>
 							<div class="col-lg-6">

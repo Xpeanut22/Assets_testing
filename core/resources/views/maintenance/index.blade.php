@@ -1,6 +1,97 @@
 @extends('main')
 @section('content')
 
+
+<style>
+    .select2 {
+        width: 100% !important;
+        /* height: 100% !important; */
+        border-radius: 5px;
+    }
+
+    .select2-container--default .select2-selection--single {
+        /* border: var(--bs-border-width) solid var(--bs-border-color);
+        background: transparent;
+        padding: 0.3rem !important; */
+        height: calc(2.5rem + 2px) !important;
+    }
+
+    /* ced4da */
+
+    .select2-container--default .select2-results>.select2-results__options {
+        background-color: var(--bs-body-bg);
+    }
+
+    .select2-container--default .select2-results__option--selected {
+        background-color: transparent;
+    }
+
+    .select2-search--dropdown {
+        background-color: var(--bs-body-bg);
+        border: var(--bs-border-width) solid var(--bs-border-color);
+    }
+
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+        background-color: var(--bs-body-bg);
+    }
+
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+        border: 1px solid #aaa;
+    }
+
+    .select2-container--default.select2-container--open.select2-container--below .select2-selection--single {
+        border: 1px solid #86b7fe;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: var(--bs-body-color);
+        line-height: 45px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 55px;
+        right: 12px;
+    }
+
+    /* Select 2 Multiple  */
+    .select2-container--default .select2-selection--multiple {
+        /* height: 55px; */
+        border: var(--bs-border-width) solid var(--bs-border-color);
+        background-color: transparent;
+    }
+
+    .select2-container--default.select2-container--focus .select2-selection--multiple {
+        background-color: transparent;
+        border: 1px solid #86b7fe;
+        outline: 0;
+    }
+
+    .select2-container--open .select2-dropdown--below {
+        border: 1px solid #86b7fe;
+    }
+
+    .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable {
+        background-color: #4079d6;
+        color: white;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        border: var(--bs-border-width) solid var(--bs-border-color);
+        background-color: transparent;
+        border-radius: 5px;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        border-right: none;
+        padding-left: 5px;
+        color: red;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+        color: red;
+        background-color: var(--bs-body-bg);
+    }
+</style>
 <section class="">
     <div class="content p-4">
         <div class="row pt-3">
@@ -70,7 +161,7 @@
                     <div class="modal-body">
                         <div class="form-group">
                             <label><?php echo trans('lang.asset'); ?></label>
-                            <select name="assetid" id="assetid" required class="form-control">
+                            <select name="assetid" id="assetid" required class="select2 selectCreate">
                                 <option value=""><?php echo trans('lang.asset'); ?></option>
                             </select>
                         </div>
@@ -127,7 +218,7 @@
                             <div class="form-group col-md-12 mb-0">
                                 <label>End Date/Time</label>
                                 <div class="input-group mb-0">
-                                    <input class="form-control"  placeholder="Please select date"
+                                    <input class="form-control" placeholder="Please select date"
                                         id="enddate" name="enddate" type="datetime-local">
                                     <span class="input-group-addon border-1" id="date"><i
                                             class="fa fa-calendar"></i></span>
@@ -245,7 +336,7 @@
                             <div class="form-group col-md-12 mb-0">
                                 <label>End Date</label>
                                 <div class="input-group mb-0">
-                                    <input class="form-control"  required placeholder="Please select date"
+                                    <input class="form-control" required placeholder="Please select date"
                                         id="editstartdate" name="editenddate" type="datetime-local">
                                     <span class="input-group-addon border-1" id="editdate"><i
                                             class="fa fa-calendar"></i></span>
@@ -313,6 +404,11 @@
 
 <script>
     (function($) {
+
+        $('.select2').select2({
+            dropdownParent: $('#add'),
+            width: 'resolve'
+        });
 
         var loggedInUserId = "{{ Auth::user()->fullname }}";
 
@@ -383,6 +479,9 @@
                         .attr("value", id)
                         .text(name + "(" + tag + ")"));
                 });
+
+                $('#assetid').select2();
+                $('#assetid').trigger('change');
             }
         });
 

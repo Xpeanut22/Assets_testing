@@ -97,7 +97,8 @@
                 <h3 class=""><?php echo trans('lang.issuelist'); ?></h3>
             </div>
             <div class="col-md-6 text-md-right pb-md-0 pb-3">
-                <button type="button" data-toggle="modal" data-target="#batchcheckout" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i>Batch Issuance</button>
+                <button type="button" data-toggle="modal" data-target="#batchscanning" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i>Scan Issue</button>
+                <!-- <button type="button" data-toggle="modal" data-target="#batchcheckout" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i>Batch Issuance</button> -->
                 <button type="button" data-toggle="modal" data-target="#add" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i> <?php echo trans('lang.add_data'); ?></button>
             </div>
         </div>
@@ -115,6 +116,32 @@
                             <table id="data" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                 <thead>
                                     <tr>
+                                        <th>Picture</th>
+                                        <th>Name</th>
+                                        <th>Total</th>
+
+                                        <th>All Tags</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tfoot>
+                                    <tr>
+                                        <th>Picture</th>
+
+                                        <th>Name</th>
+                                        <th>Total</th>
+                                        <th>All Tags</th>
+
+                                        <th>Action</th>
+                                    </tr>
+                                </tfoot>
+
+                            </table>
+                        </div>
+                        <!-- <div class="table-responsive">
+                            <table id="data" class="table table-striped table-bordered" cellspacing="0" width="100%">
+                                <thead>
+                                    <tr>
                                         <th>ID</th>
                                         <th><?php echo trans('lang.picture'); ?></th>
                                         <th><?php echo trans('lang.name'); ?></th>
@@ -126,7 +153,6 @@
                                         <th><?php echo trans('lang.type'); ?></th>
                                         <th><?php echo trans('lang.brand'); ?></th>
                                         <th><?php echo trans('lang.quantity'); ?></th>
-                                        <!-- <th><?php echo trans('lang.avalaiblequantity'); ?></th> -->
                                         <th><?php echo trans('lang.avalaiblequantity'); ?></th>
                                         <th><?php echo trans('lang.controlno'); ?></th>
                                         <th><?php echo trans('lang.issuancetype'); ?></th>
@@ -148,7 +174,6 @@
                                         <th><?php echo trans('lang.type'); ?></th>
                                         <th><?php echo trans('lang.brand'); ?></th>
                                         <th><?php echo trans('lang.quantity'); ?></th>
-                                        <!-- <th><?php echo trans('lang.avalaiblequantity'); ?></th> -->
                                         <th><?php echo trans('lang.avalaiblequantity'); ?></th>
                                         <th><?php echo trans('lang.controlno'); ?></th>
                                         <th><?php echo trans('lang.issuancetype'); ?></th>
@@ -160,7 +185,7 @@
                                 <tbody>
                                 </tbody>
                             </table>
-                        </div>
+                        </div> -->
                     </div>
                 </div>
             </div>
@@ -516,7 +541,7 @@
                         <div class="form-row">
                             <div class="form-group col-md-12">
                                 <label><?php echo trans('lang.issueto'); ?></label>
-                                <select name="employeeid" id="checkoutemployeeid" required class="form-control">
+                                <select name="employeeid" id="employeeid" required class="form-control">
                                     <option value=""><?php echo trans('lang.issueto'); ?></option>
                                 </select>
                             </div>
@@ -536,12 +561,12 @@
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <!-- <div class="form-row">
                             <div class="form-group col-md-12">
                                 <label>I.D Number</label>
                                 <input name="idno" type="text" id="idno" class="form-control " required placeholder="I.D Number" />
                             </div>
-                        </div>
+                        </div> -->
 
                         <div class="form-row">
                             <div class="form-group col-md-12">
@@ -612,7 +637,7 @@
 
                         <div class="form-group">
                             <label><?php echo trans('lang.remarks'); ?></label>
-                            <textarea class="form-control" name="remarks" id="remarks" placeholder="<?php echo trans('lang.remarkshere'); ?>"></textarea>
+                            <textarea class="form-control" name="remarks2" id="remarks2" placeholder="<?php echo trans('lang.remarkshere'); ?>"></textarea>
                         </div>
 
                     </div>
@@ -630,10 +655,182 @@
     <!--add checkout -->
 
     <!--end checkout-->
+    <div id="batchscanning" class="modal fade" role="dialog">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+
+
+                    <div class="modal-header">
+                        <h5 class="modal-title"><?php echo trans('lang.scan_data'); ?> (Batch)</h5>
+                        <button type="button" class="reloaddata ml-3 badge badge-data text-white background-green">
+                            Reload
+                        </button>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+
+                        <!-- ALERTS -->
+                        <div id="scansuccess" class="display-none alert alert-success">
+                            Data successfully saved.
+                        </div>
+                        <div id="scanfail" class="display-none alert alert-danger">
+                            Error saving data.
+                        </div>
+
+                        <!-- SCAN INPUT -->
+                        <div class="form-row">
+                            <div class="form-group col-md-12">
+                                <label>Scan Item</label>
+                                <input name="search" type="text" id="scansearchbatch"
+                                    class="form-control"
+                                    required
+                                    placeholder="Scan Asset Tag / Serial..." />
+                            </div>
+                        </div>
+
+                <form action="#" id="batchformscanning" enctype="multipart/form-data" autocomplete="off">
+
+
+                        <!-- SCANNED LIST TABLE -->
+                        <div class="form-group mt-3">
+                            <label>Scanned Items</label>
+
+                            <table class="table table-bordered" id="scannedBatchTable">
+                                <thead>
+                                    <tr>
+                                        <th>Asset Tag</th>
+                                        <th>Asset Name</th>
+                                        <th>Quantity</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- ASSIGN TO -->
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label><?php echo trans('lang.issueto'); ?></label>
+                                <select name="checkoutemployeeid1" id="checkoutemployeeid1"
+                                    required class="form-control">
+                                    <option value=""><?php echo trans('lang.issueto'); ?></option>
+                                </select>
+                            </div>
+
+                            <!-- <div class="form-group col-md-6">
+                                <label>Department / Office Representing</label>
+                                <select name="depid" id="depid"
+                                    required class="form-control">
+                                    <option value="">Select Department</option>
+                                </select>
+                            </div> -->
+
+                            <div class="form-group col-md-6">
+                                <label>Department / Office Representing</label>
+                                <select name="depid" id="depid" required class="select2 selectCreate">
+                                    <option value=""></option>
+                                </select>
+                                <!-- <input class="form-control" name="depid" id="depid" placeholder="Department / Office Representing"></input> -->
+                            </div>
+                        </div>
+
+                        <!-- CONTROL / DATE -->
+                        <div class="form-row">
+
+                            <div class="form-group col-md-6">
+                                <label><?php echo trans('lang.controlno'); ?></label>
+                                <input class="form-control"
+                                    name="controlno"
+                                    id="controlno_batch"
+                                    placeholder="<?php echo trans('lang.controlno'); ?>">
+                            </div>
+
+                            <div class="form-group col-md-6">
+                                <label>Issuance Date & Time</label>
+                                <input class="form-control"
+                                    readonly
+                                    required
+                                    id="checkindate"
+                                    name="checkindate"
+                                    type="datetime-local">
+                            </div>
+
+                        </div>
+
+                        <!-- CONDITION / PURPOSE -->
+                        <div class="form-row">
+
+                            <div class="form-group col-md-6">
+                                <label>Condition of Equipment</label>
+                                <select name="core" id="core"
+                                    required class="form-control">
+                                    <option value=""></option>
+                                    <option value="Serviceable">Serviceable</option>
+                                    <option value="Under Maintenance">Under Maintenance</option>
+                                    <option value="For Repair">For Repair</option>
+                                    <option value="For Upgrade">For Upgrade</option>
+                                </select>
+                            </div>
+
+                         
+                            <div class="form-group col-md-6">
+                                <label><?php echo trans('lang.issuancetype'); ?></label>
+                                <select name="issuancetype1" id="issuancetype1" required class="form-control">
+                                    <option value="" disabled><?php echo trans('lang.issuancetype'); ?></option>
+                                    <!-- <option value="1"><?php echo trans('lang.mr'); ?></option>
+                                    <option value="2"><?php echo trans('lang.dod'); ?></option> -->
+                                    <option value="3"><?php echo trans('lang.issuanceform'); ?></option>
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <!-- ISSUED BY -->
+                        <!-- <div class="form-row">
+                            <div class="form-group col-md-12">
+                                <label>Issued By</label>
+                                <input class="form-control"
+                                    name="receivedby1"
+                                    id="receivedby1"
+                                    readonly>
+                            </div>
+                        </div> -->
+
+                        <!-- REMARKS -->
+                        <div class="form-group">
+                            <label><?php echo trans('lang.remarks'); ?></label>
+                            <textarea class="form-control"
+                                name="remarks"
+                                id="remarks"
+                                placeholder="<?php echo trans('lang.remarkshere'); ?>"></textarea>
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="submit"
+                            class="btn btn-success"
+                            id="saveBatchScanning">
+                            Save All Scans
+                        </button>
+
+                        <button type="button"
+                            class="btn btn-default"
+                            data-dismiss="modal">
+                            <?php echo trans('lang.close'); ?>
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- batch issuance  -->
     <div id="batchcheckout" class="modal fade" role="dialog">
-        <div class="modal-dialog ">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
 
                 <form action="#" id="batchformcheckout" enctype="multipart/form-data" autocomplete="off">
@@ -659,12 +856,31 @@
 
                         </div>
 
-                        <div class="form-row">
+                        <div class="form-group mt-3">
+                            <label>Available Items</label>
+                            <div class="form-group">
+                                <label for="componentSearch">Search by Serial</label>
+                                <input type="text" id="componentSearch" class="form-control" placeholder="Enter serial number...">
+                            </div>
+                            <table class="table table-bordered" id="componentListTable">
+                                <thead>
+                                    <tr>
+                                        <th>Select</th>
+                                        <th>Serial</th>
+                                        <th>Quantity</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <!-- <div class="form-row">
                             <div class="form-group col-md-12">
                                 <label><?php echo trans('lang.serial'); ?></label>
                                 <input name="serial1" type="text" id="serial1" class="form-control " required placeholder="<?php echo trans('lang.serial'); ?>" />
                             </div>
-                        </div>
+                        </div> -->
                         <!-- removed -->
                         <!-- <div class="form-row">
                             <div class="form-group col-md-12">
@@ -678,7 +894,7 @@
                         <div class="form-row">
                             <div class="form-group col-md-12">
                                 <label><?php echo trans('lang.issueto'); ?></label>
-                                <select name="employeeid1" id="checkoutemployeeid1" required class="form-control">
+                                <select name="employeeid1" id="employeeid1" required class="form-control">
                                     <option value=""><?php echo trans('lang.issueto'); ?></option>
                                 </select>
                             </div>
@@ -698,12 +914,12 @@
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <!-- <div class="form-row">
                             <div class="form-group col-md-12">
                                 <label>I.D Number</label>
                                 <input name="idno" type="text" id="idno" class="form-control " required placeholder="I.D Number" />
                             </div>
-                        </div>
+                        </div> -->
 
                         <div class="form-row">
                             <div class="form-group col-md-12">
@@ -713,9 +929,9 @@
                         </div>
 
                         <div class="form-group col-md-12">
-                                <label><?php echo trans('lang.quantity'); ?></label>
-                                <input name="quantity" type="text" id="quantity" class="form-control " required placeholder="<?php echo trans('lang.quantity'); ?>" />
-                            </div>
+                            <label><?php echo trans('lang.quantity'); ?></label>
+                            <input name="quantity" type="text" id="quantity" class="form-control " required placeholder="<?php echo trans('lang.quantity'); ?>" />
+                        </div>
 
                         <!-- <div class="form-row">
                             <div class="form-group col-md-12 mb-0">
@@ -750,9 +966,9 @@
                             <div class="form-group col-md-12">
                                 <label><?php echo trans('lang.issuancetype'); ?></label>
                                 <select name="issuancetype1" id="issuancetype1" required class="form-control">
-                                    <option value=""><?php echo trans('lang.issuancetype'); ?></option>
-                                    <option value="1"><?php echo trans('lang.mr'); ?></option>
-                                    <option value="2"><?php echo trans('lang.dod'); ?></option>
+                                    <option value="" disabled><?php echo trans('lang.issuancetype'); ?></option>
+                                    <!-- <option value="1"><?php echo trans('lang.mr'); ?></option>
+                                    <option value="2"><?php echo trans('lang.dod'); ?></option> -->
                                     <option value="3"><?php echo trans('lang.issuanceform'); ?></option>
                                 </select>
                             </div>
@@ -843,13 +1059,21 @@
 </section>
 
 <script>
-    function zeroquantity(avalaiblequantity) {
-        // console.log(avalaiblequantity)
-        if (avalaiblequantity == 0) {
-            return "<span class='badge badge-data text-white background-red'>Issued</span>";
-        } else {
-            return avalaiblequantity;
+    function zeroquantity(quantity, checkstatus) {
+        var remainingQty = parseInt(quantity, 10);
+        if (isNaN(remainingQty)) {
+            remainingQty = 0;
         }
+
+        if (checkstatus == 2 && remainingQty <= 0) {
+            return "<span class='badge badge-data text-white background-red'>Issued</span>";
+        }
+
+        if (remainingQty > 0) {
+            return "<span class='badge badge-data text-white background-green'>Remaining: " + remainingQty + "</span>";
+        }
+
+        return "<span class='badge badge-data text-white background-red'>Issued</span>";
     }
 
     function controlnumber(control_number) {
@@ -935,297 +1159,243 @@
 
         });
 
+        function generateBatchControlNumber() {
+            $.ajax({
+                type: "GET",
+                url: "{{ url('generateComponentControlNumber') }}",
+                data: {
+                    prefix: "IF"
+                },
+                dataType: "JSON",
+                success: function(response) {
+                    if (response && response.success) {
+                        $('#controlno_batch').val(response.message);
+                    }
+                }
+            });
+        }
 
 
         "use strict";
-        $('#data').DataTable({
-            ajax: "{{ url('component')}}",
+
+        var table = $('#data').DataTable({
+            ajax: {
+                url: "{{ url('getGroupedComponents') }}"
+            },
             columns: [{
-                    data: 'id',
+                    data: 'pictures',
+                    title: 'Picture',
                     orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-
-                {
-                    data: 'pictures'
-                },
-
-                {
-                    data: 'name'
+                    searchable: false
                 },
                 {
-                    data: 'serial',
-                    orderable: false,
-                    searchable: true,
-                    visible: true
+                    data: 'name',
+                    title: 'Component Name'
                 },
                 {
-                    data: 'purchasedate',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
+                    data: 'all_controls',
+                    visible: false,
+                    searchable: true
                 },
                 {
-                    data: 'cost',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-
-                {
-                    data: 'description',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'location',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'type'
-                },
-                {
-                    data: 'brand'
-                },
-                {
-                    data: 'caquantity'
-                },
-
-                {
-                    data: function(e) {
-                        return zeroquantity(e.avalaiblequantity);
-                    },
-                },
-                {
-                    data: function(e) {
-                        return controlnumber(e.control_number);
-                    },
-                },
-                {
-                    data: function(e) {
-                        return issuetype(e.issuancetype);
-                    },
-                },
-                {
-                    data: 'created_at'
-                },
-                {
-                    data: 'cacreated'
+                    data: 'total',
+                    title: 'Total Items'
                 },
                 {
                     data: 'action',
                     orderable: false,
                     searchable: false
                 }
-            ],
-            dom: "<'row'<'col-sm-9 text-left'B><'col-sm-3'f>>" +
-                "<'row'<'col-sm-12'tr>>" +
-                "<'row'<'col-sm-2'l><'col-sm-5'i><'col-sm-5'p>>",
-            buttons: [{
-                    extend: 'copy',
-                    text: 'Copy <i class="fa fa-files-o"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.component_list '); ?>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    }
-                },
-                {
-                    extend: 'csv',
-                    text: 'CSV <i class="fa fa-file-excel-o"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.component_list'); ?>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    }
-                },
-                {
-                    extend: 'pdf',
-                    text: 'PDF <i class="fa fa-file-pdf-o"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.component_list'); ?>',
-                    orientation: 'landscape',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    },
-                    customize: function(doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-
-                    }
-                },
-                {
-                    extend: 'print',
-                    title: '<?php echo trans('lang.component_list'); ?>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    text: 'Print <i class="fa fa-print"></i>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    }
-                }
             ]
         });
+
+        $('#data tbody').on('click', '.btn-show-component', function() {
+
+            var tr = $(this).closest('tr');
+            var row = table.row(tr);
+            var name = $(this).data('name');
+
+            if (row.child.isShown()) {
+                row.child.hide();
+                tr.removeClass('shown');
+            } else {
+
+                $.get("{{ url('getComponentsByName') }}/" + encodeURIComponent(name), function(data) {
+
+                    var html = '<table class="table table-bordered" style="width:100%">';
+                    html += '<thead><tr>';
+                    html += '<th>Serial</th>';
+                    html += '<th>Supplier</th>';
+                    html += '<th>Brand</th>';
+                    html += '<th>Location</th>';
+                    html += '<th>Type</th>';
+                    html += '<th>Quantity</th>';
+                    html += '<th>Available Quantity</th>';
+                    html += '<th>Control No.</th>';
+                    html += '<th>Issue Type</th>';
+                    html += '<th>Action</th>';
+                    html += '</tr></thead><tbody>';
+
+                    data.forEach(function(item) {
+                        html += '<tr>';
+                        html += '<td>' + (item.serial ?? '-') + '</td>';
+                        html += '<td>' + (item.supplier ?? '-') + '</td>';
+                        html += '<td>' + (item.brand ?? '-') + '</td>';
+                        html += '<td>' + (item.location ?? '-') + '</td>';
+                        html += '<td>' + (item.type ?? '-') + '</td>';
+                        html += '<td>' + (item.quantity ?? '-') + '</td>';
+                        html += '<td>' + zeroquantity(item.caquantity, item.checkstatus) + '</td>';
+                        html += '<td>' + (item.control_number ?? '-') + '</td>';
+                        html += '<td>' + issuetype(item.issuancetype ?? '-') + '</td>';
+                        html += '<td>' + item.action + '</td>';
+                        html += '</tr>';
+                    });
+
+                    html += '</tbody></table>';
+
+                    row.child(html).show();
+                    tr.addClass('shown');
+                });
+            }
+        });
+
+        //  old datatable 
+        // "use strict";
+        // $('#data').DataTable({
+        //     ajax: "{{ url('component')}}",
+        //     columns: [{
+        //             data: 'id',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+
+        //         {
+        //             data: 'pictures'
+        //         },
+
+        //         {
+        //             data: 'name'
+        //         },
+        //         {
+        //             data: 'serial',
+        //             orderable: false,
+        //             searchable: true,
+        //             visible: true
+        //         },
+        //         {
+        //             data: 'purchasedate',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+        //         {
+        //             data: 'cost',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+
+        //         {
+        //             data: 'description',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+        //         {
+        //             data: 'location',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+        //         {
+        //             data: 'type'
+        //         },
+        //         {
+        //             data: 'brand'
+        //         },
+        //         {
+        //             data: 'caquantity'
+        //         },
+
+        //         {
+        //             data: function(e) {
+        //                 return zeroquantity(e.avalaiblequantity);
+        //             },
+        //         },
+        //         {
+        //             data: function(e) {
+        //                 return controlnumber(e.control_number);
+        //             },
+        //         },
+        //         {
+        //             data: function(e) {
+        //                 return issuetype(e.issuancetype);
+        //             },
+        //         },
+        //         {
+        //             data: 'created_at'
+        //         },
+        //         {
+        //             data: 'cacreated'
+        //         },
+        //         {
+        //             data: 'action',
+        //             orderable: false,
+        //             searchable: false
+        //         }
+        //     ],
+        //     dom: "<'row'<'col-sm-9 text-left'B><'col-sm-3'f>>" +
+        //         "<'row'<'col-sm-12'tr>>" +
+        //         "<'row'<'col-sm-2'l><'col-sm-5'i><'col-sm-5'p>>",
+        //     buttons: [{
+        //             extend: 'copy',
+        //             text: 'Copy <i class="fa fa-files-o"></i>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             title: '<?php echo trans('lang.component_list '); ?>',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        //             }
+        //         },
+        //         {
+        //             extend: 'csv',
+        //             text: 'CSV <i class="fa fa-file-excel-o"></i>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             title: '<?php echo trans('lang.component_list'); ?>',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        //             }
+        //         },
+        //         {
+        //             extend: 'pdf',
+        //             text: 'PDF <i class="fa fa-file-pdf-o"></i>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             title: '<?php echo trans('lang.component_list'); ?>',
+        //             orientation: 'landscape',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        //             },
+        //             customize: function(doc) {
+        //                 doc.styles.tableHeader.alignment = 'left';
+
+        //             }
+        //         },
+        //         {
+        //             extend: 'print',
+        //             title: '<?php echo trans('lang.component_list'); ?>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             text: 'Print <i class="fa fa-print"></i>',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        //             }
+        //         }
+        //     ]
+        // });
 
 
         //get all supplier
 
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listsupplier')}}",
-            dataType: "JSON",
-            success: function(html) {
-                $("#supplierid").append($("<option></option>")
-                    .attr("value", "")
-                    .text(""));
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.name);
-                    $("#supplierid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#editsupplierid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-                $("#supplierid").append($("<option></option>")
-                    .attr("value", "supplierid")
-                    .text("Add New Data"));
-            }
-        });
 
-        //get all units
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listunit')}}",
-            dataType: "JSON",
-            success: function(html) {
-                $("#unit").append($("<option></option>")
-                    .attr("value", "")
-                    .text(""));
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.unit);
-                    $("#unit").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#editunit").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-                $("#unit").append($("<option></option>")
-                    .attr("value", "unit")
-                    .text("Add New Data"));
-            }
-
-        });
-
-
-        //get all asset type
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listassettype')}}",
-            dataType: "JSON",
-            success: function(html) {
-                $("#typeid").append($("<option></option>")
-                    .attr("value", "")
-                    .text(""));
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.name);
-                    $("#typeid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#edittypeid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-                $("#typeid").append($("<option></option>")
-                    .attr("value", "typeid")
-                    .text("Add New Data"));
-            }
-        });
-
-        //get all brand 
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listbrand')}}",
-            dataType: "JSON",
-            success: function(html) {
-                $("#brandid").append($("<option></option>")
-                    .attr("value", "")
-                    .text(""));
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.name);
-                    $("#brandid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#editbrandid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-                $("#brandid").append($("<option></option>")
-                    .attr("value", "brandid")
-                    .text("Add New Data"));
-            }
-        });
-
-        //get all location 
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listlocation')}}",
-            dataType: "JSON",
-            success: function(html) {
-                $("#locationid").append($("<option></option>")
-                    .attr("value", "")
-                    .text(""));
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.name);
-                    $("#locationid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#editlocationid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-                $("#locationid").append($("<option></option>")
-                    .attr("value", "locationid")
-                    .text("Add New Data"));
-            }
-        });
-
-        //get all asset list
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listasset')}}",
-            dataType: "JSON",
-            success: function(html) {
-                $("#checkoutassetid").append($("<option></option>")
-                    .attr("value", "")
-                    .text(""));
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.name);
-
-                    $("#checkoutassetid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-                $("#checkoutassetid").append($("<option></option>")
-                    .attr("value", "checkoutassetid")
-                    .text("Add New Data"));
-            }
-        });
 
         //add data
         $("#formadd").validate({
@@ -1375,6 +1545,270 @@
             }
         });
 
+
+        function showreference() {
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listsupplier')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#supplierid").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+                        $("#supplierid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#editsupplierid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                    $("#supplierid").append($("<option></option>")
+                        .attr("value", "supplierid")
+                        .text("Add New Data"));
+                }
+            });
+
+            //get all units
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listunit')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#unit").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.unit);
+                        $("#unit").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#editunit").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                    $("#unit").append($("<option></option>")
+                        .attr("value", "unit")
+                        .text("Add New Data"));
+                }
+
+            });
+
+
+            //get all asset type
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listassettype')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#typeid").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+                        $("#typeid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#edittypeid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                    $("#typeid").append($("<option></option>")
+                        .attr("value", "typeid")
+                        .text("Add New Data"));
+                }
+            });
+
+            //get all brand 
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listbrand')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#brandid").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+                        $("#brandid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#editbrandid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                    $("#brandid").append($("<option></option>")
+                        .attr("value", "brandid")
+                        .text("Add New Data"));
+                }
+            });
+
+            //get all location 
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listlocation')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#locationid").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+                        $("#locationid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#editlocationid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                    $("#locationid").append($("<option></option>")
+                        .attr("value", "locationid")
+                        .text("Add New Data"));
+                }
+            });
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listdepartment')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#depid").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+                        $("#depid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#editdepid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+
+                        $('#depid').trigger('change');
+                        $('#depid').select2();
+
+                    });
+                    $("#depid").append($("<option></option>")
+                        .attr("value", "depid")
+                        .text("Add New Data"));
+                }
+            });
+
+            //get all asset list
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listasset')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#checkoutassetid").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+
+                        $("#checkoutassetid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                    $("#checkoutassetid").append($("<option></option>")
+                        .attr("value", "checkoutassetid")
+                        .text("Add New Data"));
+                }
+            });
+
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listemployees')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.fullname);
+                        $("#checkinemployeeid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#checkoutemployeeid1").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#checkoutemployeeid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                }
+            });
+
+            // get all receiver, logistic custodian
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listreceiver')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.fullname);
+                        $("#receivedby").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#receivedby1").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#editdepartment").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                    });
+                }
+            });
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listcomponent') }}",
+                dataType: "JSON",
+                success: function(response) {
+                    // Access the 'data' array from the response
+                    var objs = response.data;
+
+                    // Clear the dropdown before appending new options
+                    $("#checkoutname1").empty();
+
+                    // Iterate through each item in the data array
+                    $.each(objs, function(index, item) {
+                        var name = decodeURIComponent(item.name); // Decode name if necessary
+                        var groupid = decodeURIComponent(item.groupid); // Decode groupid if necessary
+
+                        // Append each option to the dropdown
+                        $("#checkoutname1").append($("<option></option>")
+                            .attr("value", groupid) // Set the value to groupid
+                            .text(name)); // Set the text to name
+                    });
+                },
+                error: function(xhr, status, error) {
+                    // Handle any errors that occurred during the request
+                    console.error("AJAX Error: ", status, error);
+                }
+            });
+
+
+        }
+
         //delete data
         // $("#formdelete").validate({
         //     submitHandler: function(form) {
@@ -1441,6 +1875,7 @@
         var x;
 
         function showEditModal() {
+            showreference();
             // $("#edit").prop('class', 'modal fade');
             if (targetModalEvent) {
                 var $modal = $('#edit'),
@@ -1590,80 +2025,101 @@
             showreference();
         })
 
+        $("#add").on('show.bs.modal', function(e) {
+            showreference();
+        });
+        $("#batchscanning").on('show.bs.modal', function(e) {
+            showreference();
+            generateBatchControlNumber();
+        });
 
 
         //get all employee
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listemployees')}}",
-            dataType: "JSON",
-            success: function(html) {
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.fullname);
-                    $("#checkinemployeeid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#checkoutemployeeid1").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#checkoutemployeeid").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-            }
+
+
+        $("#checkoutname1").on("change", function() {
+
+            var groupid = $(this).val();
+
+            if (groupid == "") return;
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('getcomponentbygroup') }}",
+                data: {
+                    groupid: groupid
+                },
+                dataType: "JSON",
+                success: function(response) {
+
+                    var tableBody = $("#componentListTable tbody");
+                    tableBody.empty();
+
+                    $.each(response.data, function(index, item) {
+
+                        var statusText = item.checkstatus == 0 ? "Available" : "Issued";
+
+                        var row = `
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="component_ids[]" value="${item.id}">
+                        </td>
+                        <td>${item.serial}</td>
+                        <td>${item.quantity}</td>
+                        <td>${statusText}</td>
+                    </tr>
+                `;
+
+                        tableBody.append(row);
+                    });
+                }
+            });
         });
 
-        // get all receiver, logistic custodian
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listreceiver')}}",
-            dataType: "JSON",
-            success: function(html) {
-                var objs = html.message;
-                jQuery.each(objs, function(index, record) {
-                    var id = decodeURIComponent(record.id);
-                    var name = decodeURIComponent(record.fullname);
-                    $("#receivedby").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#receivedby1").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                    $("#editdepartment").append($("<option></option>")
-                        .attr("value", id)
-                        .text(name));
-                });
-            }
-        });
 
-        $.ajax({
-            type: "GET",
-            url: "{{ url('listcomponent') }}",
-            dataType: "JSON",
-            success: function(response) {
-                // Access the 'data' array from the response
-                var objs = response.data;
 
-                // Clear the dropdown before appending new options
-                $("#checkoutname1").empty();
+        // $.ajax({
+        //     type: "GET",
+        //     url: "{{ url('listcomponent') }}",
+        //     dataType: "JSON",
+        //     success: function(response) {
 
-                // Iterate through each item in the data array
-                $.each(objs, function(index, item) {
-                    var name = decodeURIComponent(item.name); // Decode name if necessary
-                    var groupid = decodeURIComponent(item.groupid); // Decode groupid if necessary
+        //         var objs = response.data;
+        //         var tableBody = $("#consumableTable tbody");
+        //         tableBody.empty();
 
-                    // Append each option to the dropdown
-                    $("#checkoutname1").append($("<option></option>")
-                        .attr("value", groupid) // Set the value to groupid
-                        .text(name)); // Set the text to name
-                });
-            },
-            error: function(xhr, status, error) {
-                // Handle any errors that occurred during the request
-                console.error("AJAX Error: ", status, error);
-            }
+        //         $.each(objs, function(index, item) {
+
+        //             var row = `
+        //         <tr>
+        //             <td>
+        //                 <input type="checkbox" name="items[${index}][selected]" value="1">
+        //                 <input type="hidden" name="items[${index}][componentid]" value="${item.groupid}">
+        //             </td>
+        //             <td>${item.name}</td>
+        //             <td>${item.quantity}</td>
+        //             <td>
+        //                 <input type="number" 
+        //                        name="items[${index}][quantity]" 
+        //                        class="form-control"
+        //                        min="1"
+        //                        max="${item.quantity}">
+        //             </td>
+        //         </tr>
+        //     `;
+
+        //             tableBody.append(row);
+        //         });
+        //     }
+        // });
+
+        // Filter table rows based on serial input
+        $("#componentSearch").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+
+            $("#componentListTable tbody tr").filter(function() {
+                $(this).toggle($(this).find("td:eq(1)").text().toLowerCase().indexOf(value) > -1);
+            });
         });
 
         //checkout
@@ -1780,6 +2236,194 @@
                 id = $(e.relatedTarget).attr('customdata');
             $("#iddelete").val(id);
         });
+        let scannedComponents = [];
+
+        $('#scansearchbatch').on('keypress', function(e) {
+
+            if (e.which === 13) {
+                e.preventDefault();
+
+                let searchValue = $(this).val().trim();
+                if (!searchValue) return;
+
+                $.ajax({
+                    type: "POST",
+                    url: "{{ url('componentBySerial') }}",
+                    data: {
+                        receivedby: loggedInUserId,
+                        searchValue: searchValue
+                    },
+                    dataType: "JSON",
+                    success: function(data) {
+
+                        if (data.success === 'success' && data.message) {
+
+                            const assetId = data.message.serial;
+
+                            const alreadyScanned = scannedComponents.some(
+                                item => item.serial === assetId
+                            );
+
+                            if (alreadyScanned) {
+                                alert("Component already scanned.");
+                                return;
+                            }
+
+                            const dbQuantity = parseInt(data.message.quantity, 10) || 1;
+                            const isEditableQuantity = dbQuantity > 1;
+
+                            scannedComponents.push({
+                                ...data.message,
+                                available_quantity: dbQuantity,
+                                requested_quantity: 1
+                            });
+
+                            $('#scannedBatchTable tbody').append(`
+                        <tr data-id="${assetId}">
+                            <td>${data.message.serial}</td>
+                            <td>${data.message.name}</td>
+                            <td>
+                                <input
+                                    type="number"
+                                    class="form-control form-control-sm batch-qty-input"
+                                    data-serial="${assetId}"
+                                    min="1"
+                                    max="${dbQuantity}"
+                                    value="1"
+                                    ${isEditableQuantity ? '' : 'readonly'}
+                                >
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-danger remove-scan">
+                                    Remove
+                                </button>
+                            </td>
+                        </tr>
+                    `);
+
+                            $('#scansearchbatch').val('').focus();
+                        } else {
+
+                            if (data.message === 'already_issued') {
+                                alert("Component is already issued.");
+                            } else {
+                                alert("Component not available.");
+                            }
+                        }
+                    }
+                });
+            }
+        });
+
+        $(document).on('click', '.remove-scan', function() {
+
+            let row = $(this).closest('tr');
+            let serial = row.data('id');
+
+            scannedComponents = scannedComponents.filter(item =>
+                item.serial !== serial
+            );
+
+            row.remove();
+        });
+
+        $(document).on('input change', '.batch-qty-input', function() {
+            const $input = $(this);
+            const serial = $input.data('serial');
+            const maxQty = parseInt($input.attr('max'), 10) || 1;
+            let requestedQty = parseInt($input.val(), 10);
+
+            if (Number.isNaN(requestedQty) || requestedQty < 1) {
+                requestedQty = 1;
+            } else if (requestedQty > maxQty) {
+                requestedQty = maxQty;
+            }
+
+            $input.val(requestedQty);
+
+            scannedComponents = scannedComponents.map(item =>
+                item.serial === serial ? {
+                    ...item,
+                    requested_quantity: requestedQty
+                } : item
+            );
+        });
+
+$('#batchformscanning').on('submit', function(e) {
+    e.preventDefault();
+
+    if (scannedComponents.length === 0) {
+        alert("No components scanned.");
+        return;
+    }
+
+    let formData = $(this).serializeArray();
+
+    let dataObject = {};
+    formData.forEach(function(field) {
+        dataObject[field.name] = field.value;
+    });
+
+    const qtyErrors = [];
+    $('#scannedBatchTable tbody tr').each(function() {
+        const $row = $(this);
+        const serial = $row.data('id');
+        const $qtyInput = $row.find('.batch-qty-input');
+        const requestedQty = parseInt($qtyInput.val(), 10);
+        const maxQty = parseInt($qtyInput.attr('max'), 10) || 1;
+
+        if (Number.isNaN(requestedQty) || requestedQty < 1 || requestedQty > maxQty) {
+            $qtyInput.addClass('is-invalid');
+            qtyErrors.push(`${serial}: quantity must be between 1 and ${maxQty}.`);
+            return;
+        }
+
+        $qtyInput.removeClass('is-invalid');
+
+        scannedComponents = scannedComponents.map(item =>
+            item.serial === serial ? {
+                ...item,
+                requested_quantity: requestedQty
+            } : item
+        );
+    });
+
+    if (qtyErrors.length > 0) {
+        alert(qtyErrors.join("\n"));
+        return;
+    }
+
+    // attach scanned components
+    dataObject.components = scannedComponents.map(item => ({
+        ...item,
+        available_quantity: item.available_quantity || (parseInt(item.quantity, 10) || 1),
+        issue_quantity: item.requested_quantity || 1,
+        quantity: item.requested_quantity || 1
+    }));
+
+    $.ajax({
+        type: "POST",
+        url: "{{ url('saveBatchComponentCheckout') }}",
+        data: dataObject,
+        success: function(response) {
+            if (response && response.success && response.print_url) {
+                window.open(response.print_url, '_blank');
+            }
+            alert("Batch Issued Successfully");
+
+            scannedComponents = [];
+            $('#scannedBatchTable tbody').empty();
+            $('#batchformscanning')[0].reset();
+        },
+        error: function(xhr) {
+            var message = "Failed to save batch issuance.";
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                message = xhr.responseJSON.message;
+            }
+            alert(message);
+        }
+    });
+});
 
     })(jQuery);
 </script>

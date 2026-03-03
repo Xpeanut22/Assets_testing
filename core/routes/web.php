@@ -17,6 +17,7 @@ Route::get('/','Home@index');
 Route::get('/home','Home@index');
 Route::get('/brandlist','Brand@index');
 Route::get('/departmentlist','Department@index');
+Route::get('/typeofidlist','Typeofid@index');
 Route::get('/assettypelist','AssetType@index');
 Route::get('/locationlist','Location@index');
 Route::get('/employeeslist','Employees@index');
@@ -105,6 +106,15 @@ Route::post('savedepartment', 'Department@save');
 Route::post('updatedepartment', 'Department@update');
 Route::post('deletedepartment', 'Department@delete');
 Route::post('departmentbyid', 'Department@byid');
+
+
+//Type of ID API
+Route::get('typeofid', 'Typeofid@getdata');
+Route::get('listtypeofid', 'Typeofid@getrows');
+Route::post('savetypeofid', 'Typeofid@save');
+Route::post('updatetypeofid', 'Typeofid@update');
+Route::post('deletetypeofid', 'Typeofid@delete');
+Route::post('typeofidbyid', 'Typeofid@byid');
 
 //Asset Type API
 Route::get('assettype', 'AssetType@getdata');
@@ -199,6 +209,9 @@ Route::post('assetbyid', 'Asset@byid');
 Route::post('savecheckout', 'Asset@savecheckout');
 Route::post('savecheckin', 'Asset@savecheckin');
 Route::post('historyassetbyid', 'Asset@historyassetbyid');
+Route::get('getGroupedAssets', 'Asset@getGroupedAssets');
+Route::get('getAssetsByName/{name}', 'Asset@getAssetsByName');
+
 Route::get('asset/generateproductcode', 'Asset@generateproductcode');
 Route::get('assetnotbyid', 'Asset@isnotbyid');
 
@@ -226,14 +239,26 @@ Route::post('updatecomponent', 'Component@update');
 Route::post('deletecomponent', 'Component@delete');
 Route::post('savecheckoutcomponent', 'Component@savecheckout');
 Route::post('batchsavecheckoutcomponent', 'Component@batchsavecheckout');
+Route::post('saveBatchComponentCheckout', 'Component@saveBatchComponentCheckout');
+Route::get('component/batchissuanceprint', 'Component@batchissuanceprint');
+Route::get('generateComponentControlNumber', 'Component@generateControlNumber');
+
+
 
 Route::post('savecheckincomponent', 'Component@savecheckin');
 Route::post('componentbyid', 'Component@byid');
 Route::post('singlehistorycomponentbyid', 'Component@singlehistorycomponentbyid');
 Route::get('component/generateproductcode', 'Component@generateproductcode');
 Route::post('componentassetbyid', 'Component@assetsbyid');
+Route::post('componentBySerial', 'Component@componentBySerial');
 Route::post('historycomponentbyid', 'Component@historycomponentbyid');
 Route::get('componentnotbyid', 'Component@isnotbyid');
+Route::get('getcomponentbygroup', 'Component@getcomponentbygroup');
+Route::get('getGroupedComponents', 'Component@getGroupedComponents');
+Route::get('getComponentsByName/{name}', 'Component@getComponentsByName');
+
+
+
 
 //Maintenance API
 Route::get('maintenance', 'Maintenance@getdata');

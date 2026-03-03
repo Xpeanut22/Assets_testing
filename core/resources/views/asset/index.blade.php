@@ -92,6 +92,7 @@
     }
 </style>
 
+
 <section class="">
     <div class="content p-4">
         <div class="row pt-3">
@@ -115,9 +116,34 @@
                         <div id="messageupdate" class="display-none alert alert-success"><?php echo trans('lang.data_updated'); ?></div>
                         <div id="messagescansuccess" class="display-none alert alert-success"><?php echo trans('lang.data_scan_succeess'); ?></div>
                         <div id="messagescaninvalid" class="display-none alert alert-danger"><?php echo trans('lang.data_scan_invalid'); ?></div>
-
-
                         <div class="table-responsive">
+                            <table id="data" class="table table-striped table-bordered" cellspacing="0" width="100%">
+                                <thead>
+                                    <tr>
+                                        <th>Picture</th>
+                                        <th>Name</th>
+                                        <th>Total</th>
+
+                                        <th>All Tags</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tfoot>
+                                    <tr>
+                                        <th>Picture</th>
+
+                                        <th>Name</th>
+                                        <th>Total</th>
+                                        <th>All Tags</th>
+
+                                        <th>Action</th>
+                                    </tr>
+                                </tfoot>
+
+                            </table>
+                        </div>
+
+                        <!-- <div class="table-responsive">
                             <table id="data" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                 <thead>
                                     <tr>
@@ -163,7 +189,7 @@
                                 </tfoot>
 
                             </table>
-                        </div>
+                        </div> -->
                     </div>
                 </div>
             </div>
@@ -663,18 +689,23 @@
                                 <label><?php echo trans('lang.controlno'); ?></label>
                                 <input class="form-control" name="controlno" id="controlno" placeholder="<?php echo trans('lang.controlno'); ?>"></input>
                             </div>
-                            <div class="form-group col-md-6" id="returnerinput">
+                            <!-- <div class="form-group col-md-6" id="returnerinput">
                                 <label>Type of I.D</label>
-                                <input class="form-control" name="typeofid" id="typeofid" placeholder="Type of I.D"></input>
-                            </div>
+                                <select name="typeofid" id="typeofid" required class="select2 selectCreate">
+                                    <option value=""></option>
+                                </select>
+                            </div> -->
 
-                            <div class="form-group col-md-6" id="returnerinput1">
+                            <!-- <div class="form-group col-md-6" id="returnerinput1">
                                 <label>I.D Number</label>
                                 <input class="form-control" name="idno" id="idno" placeholder="I.D Number"></input>
-                            </div>
+                            </div> -->
                             <div class="form-group col-md-6" id="returnerinput2">
                                 <label>Department / Office Representing</label>
-                                <input class="form-control" name="depid" id="depid" placeholder="Department / Office Representing"></input>
+                                <select name="depid" id="depid" required class="select2 selectCreate">
+                                    <option value=""></option>
+                                </select>
+                                <!-- <input class="form-control" name="depid" id="depid" placeholder="Department / Office Representing"></input> -->
                             </div>
 
 
@@ -997,6 +1028,12 @@
                 } else if (selectedValue === 'used') {
                     var url = "{{ URL::to('usedlist') }}";
                     window.open(url, '_blank');
+                } else if (selectedValue === 'typeofid') {
+                    var url = "{{ URL::to('typeofidlist') }}";
+                    window.open(url, '_blank');
+                } else if (selectedValue === 'depid') {
+                    var url = "{{ URL::to('departmentlist') }}";
+                    window.open(url, '_blank');
                 }
 
             });
@@ -1043,6 +1080,7 @@
         }
 
         function assetstatusText(status) {
+            status = Number(status);
             switch (status) {
                 case 1:
                     return "Operational";
@@ -1078,95 +1116,40 @@
             }
         }
 
-        function historystatus(checkstatus) {
-            if (checkstatus == 2) {
+        function historystatus(status, checkstatus) {
+            if (status != 1) {
+                return "<span class='badge badge-data text-white background-red'>Unavailable</span>";
+            } else if (checkstatus == 2) {
                 return "<span class='badge badge-data text-white background-red'>Borrowed</span>";
             } else {
                 return "<span class='badge badge-data text-white background-blue'>Available</span>";
             }
         }
-
         "use strict";
-        $('#data').DataTable({
-            ajax: "{{ url('asset')}}",
+
+        var table = $('#data').DataTable({
+            ajax: {
+                url: "{{ url('getGroupedAssets') }}",
+
+            },
             columns: [{
-                    data: 'id',
+                    data: 'pictures',
+                    title: 'Picture',
                     orderable: false,
-                    searchable: false,
-                    visible: false
+                    searchable: false
                 },
                 {
-                    data: 'pictures'
+                    data: 'name',
+                    title: 'Asset Name'
                 },
                 {
-                    data: 'assettag'
+                    data: 'all_tags',
+                    visible: false, // hide column
+                    searchable: true // but searchable
                 },
                 {
-                    data: 'serial',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'purchasedate',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'cost',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-
-                {
-                    data: 'description',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'name'
-                },
-                {
-                    data: 'type'
-                },
-                {
-                    data: 'categoryname'
-                },
-                {
-                    data: 'brand'
-                },
-                {
-                    data: function(e) {
-                        return e.checkstatus == 2 ? e.depid : '';
-                    }
-                },
-                {
-                    data: function(e) {
-                        return assetstatus(e.status);
-                    },
-                    searchable: true
-                },
-                {
-                    data: function(e) {
-                        return assetstatusText(e.status); // For search
-                    },
-                    visible: false,
-                    searchable: true
-                },
-
-                {
-                    data: function(e) {
-                        return daylapse(e.checkstatus, e.updated_at);
-                    }
-                },
-
-                {
-                    data: function(e) {
-                        return historystatus(e.checkstatus);
-                    },
+                    data: 'total',
+                    title: 'Total Items'
                 },
 
                 {
@@ -1174,94 +1157,244 @@
                     orderable: false,
                     searchable: false
                 }
-            ],
-            buttons: [{
-                    extend: 'copy',
-                    text: 'Copy <i class="fa fa-files-o"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.asset_list '); ?>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
-                    }
-                },
-                {
-                    extend: 'csv',
-                    text: 'CSV <i class="fa fa-file-excel-o"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.asset_list'); ?>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
-                    }
-                },
-                {
-                    extend: 'pdf',
-                    text: 'PDF <i class="fa fa-file-pdf-o"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.asset_list'); ?>',
-                    orientation: 'landscape',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
-                    },
-                    customize: function(doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-                        doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                            .join('*').split('');
-                    }
-                },
-                {
-                    extend: 'print',
-                    title: '<?php echo trans('lang.asset_list'); ?>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    text: 'Print <i class="fa fa-print"></i>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
-                    }
-                }
-            ],
-            drawCallback: function() {
-                $('.dataTables_filter input').unbind();
-                $('.dataTables_filter input').bind('keyup', function(e) {
-                    var code = e.keyCode || e.which;
-                    table = $("#data").DataTable();
-                    if (code == 13) {
-                        table.search(this.value).draw();
-
-                        table.one('xhr', function() {
-                            var response = table.ajax.json();
-                            var recordsFiltered = response.recordsFiltered;
-                            if (recordsFiltered > 0) {
-                                $("#messagescansuccess").css('display', "block");
-                                $("#messagescaninvalid").css('display', "none");
-
-                                // console.log(table.search(this.value));
-                                if (table.search(this.value) !== "") {
-                                    window.setTimeout(function() {
-                                        $(".btnconfirm").click();
-                                        window.setTimeout(function() {
-                                            $(".btnbb").click();
-                                        }, 1000);
-                                    }, 1000);
-                                } else {
-                                    console.log("goods")
-                                }
-
-                                // Attach click event listener to filtered records
-                                // $("#data tbody").on("click", ".btnconfirm", function() {
-                                //     var d = table.row($(this).closest("tr")).data();
-                                //     console.log(d);
-                                // });
-
-                            } else {
-
-                                $("#messagescaninvalid").css('display', "block");
-                                $("#messagescansuccess").css('display', "none");
-                            }
-                        });
-                    }
-                });
-            },
-
+            ]
         });
+
+        $('#data tbody').on('click', '.btn-show', function() {
+
+            var tr = $(this).closest('tr');
+            var row = table.row(tr);
+            var name = $(this).data('name');
+
+            if (row.child.isShown()) {
+                row.child.hide();
+                tr.removeClass('shown');
+            } else {
+
+                $.get("{{ url('getAssetsByName') }}/" + encodeURIComponent(name), function(data) {
+
+                    var html = '<table class="table table-bordered" style="width:100%">';
+                    html += '<thead><tr>';
+                    html += '<th>Asset Tag</th>';
+                    html += '<th>Purchase Date</th>';
+                    html += '<th>Description</th>';
+                    html += '<th>Name</th>';
+                    html += '<th>Type</th>';
+                    html += '<th>Category</th>';
+                    html += '<th>Brand</th>';
+                    html += '<th>Location</th>';
+                    html += '<th>Status</th>';
+                    html += '<th>Number of Days</th>';
+                    html += '<th>History Status</th>';
+                    html += '<th>Action</th>';
+                    html += '</tr></thead><tbody>';
+
+                    data.forEach(function(item) {
+                        html += '<tr>';
+                        html += '<td>' + item.assettag + '</td>';
+                        html += '<td>' + item.purchasedate + '</td>';
+                        html += '<td>' + (item.description ?? '-') + '</td>';
+                        html += '<td>' + item.name + '</td>';
+                        html += '<td>' + item.type + '</td>';
+                        html += '<td>' + item.categoryname + '</td>';
+                        html += '<td>' + item.brand + '</td>';
+                        html += '<td>' + item.location + '</td>';
+                        html += '<td>' + assetstatusText(item.status) + '</td>';
+                        html += '<td>' + daylapse(item.checkstatus) + '</td>';
+                        html += '<td>' + historystatus(item.status, item.checkstatus) + '</td>';
+                        html += '<td>' + item.action + '</td>';
+                        html += '</tr>';
+                    });
+
+                    html += '</tbody></table>';
+
+                    row.child(html).show();
+                    tr.addClass('shown');
+
+                });
+            }
+        });
+
+
+
+        // old datatable code
+
+        // "use strict";
+        // $('#data').DataTable({
+        //     ajax: "{{ url('asset')}}",
+        //     columns: [{
+        //             data: 'id',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+        //         {
+        //             data: 'pictures'
+        //         },
+        //         {
+        //             data: 'assettag'
+        //         },
+        //         {
+        //             data: 'serial',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+        //         {
+        //             data: 'purchasedate',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+        //         {
+        //             data: 'cost',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+
+        //         {
+        //             data: 'description',
+        //             orderable: false,
+        //             searchable: false,
+        //             visible: false
+        //         },
+        //         {
+        //             data: 'name'
+        //         },
+        //         {
+        //             data: 'type'
+        //         },
+        //         {
+        //             data: 'categoryname'
+        //         },
+        //         {
+        //             data: 'brand'
+        //         },
+        //         {
+        //             data: function(e) {
+        //                 return e.checkstatus == 2 ? e.depid : '';
+        //             }
+        //         },
+        //         {
+        //             data: function(e) {
+        //                 return assetstatus(e.status);
+        //             },
+        //             searchable: true
+        //         },
+        //         {
+        //             data: function(e) {
+        //                 return assetstatusText(e.status); // For search
+        //             },
+        //             visible: false,
+        //             searchable: true
+        //         },
+
+        //         {
+        //             data: function(e) {
+        //                 return daylapse(e.checkstatus, e.updated_at);
+        //             }
+        //         },
+
+        //         {
+        //             data: function(e) {
+        //                 return historystatus(e.checkstatus);
+        //             },
+        //         },
+
+        //         {
+        //             data: 'action',
+        //             orderable: false,
+        //             searchable: false
+        //         }
+        //     ],
+        //     buttons: [{
+        //             extend: 'copy',
+        //             text: 'Copy <i class="fa fa-files-o"></i>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             title: '<?php echo trans('lang.asset_list '); ?>',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        //             }
+        //         },
+        //         {
+        //             extend: 'csv',
+        //             text: 'CSV <i class="fa fa-file-excel-o"></i>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             title: '<?php echo trans('lang.asset_list'); ?>',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        //             }
+        //         },
+        //         {
+        //             extend: 'pdf',
+        //             text: 'PDF <i class="fa fa-file-pdf-o"></i>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             title: '<?php echo trans('lang.asset_list'); ?>',
+        //             orientation: 'landscape',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        //             },
+        //             customize: function(doc) {
+        //                 doc.styles.tableHeader.alignment = 'left';
+        //                 doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
+        //                     .join('*').split('');
+        //             }
+        //         },
+        //         {
+        //             extend: 'print',
+        //             title: '<?php echo trans('lang.asset_list'); ?>',
+        //             className: 'btn btn-sm btn-fill btn-info ',
+        //             text: 'Print <i class="fa fa-print"></i>',
+        //             exportOptions: {
+        //                 columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+        //             }
+        //         }
+        //     ],
+        //     drawCallback: function() {
+        //         $('.dataTables_filter input').unbind();
+        //         $('.dataTables_filter input').bind('keyup', function(e) {
+        //             var code = e.keyCode || e.which;
+        //             table = $("#data").DataTable();
+        //             if (code == 13) {
+        //                 table.search(this.value).draw();
+
+        //                 table.one('xhr', function() {
+        //                     var response = table.ajax.json();
+        //                     var recordsFiltered = response.recordsFiltered;
+        //                     if (recordsFiltered > 0) {
+        //                         $("#messagescansuccess").css('display', "block");
+        //                         $("#messagescaninvalid").css('display', "none");
+
+        //                         // console.log(table.search(this.value));
+        //                         if (table.search(this.value) !== "") {
+        //                             window.setTimeout(function() {
+        //                                 $(".btnconfirm").click();
+        //                                 window.setTimeout(function() {
+        //                                     $(".btnbb").click();
+        //                                 }, 1000);
+        //                             }, 1000);
+        //                         } else {
+        //                             console.log("goods")
+        //                         }
+
+        //                         // Attach click event listener to filtered records
+        //                         // $("#data tbody").on("click", ".btnconfirm", function() {
+        //                         //     var d = table.row($(this).closest("tr")).data();
+        //                         //     console.log(d);
+        //                         // });
+
+        //                     } else {
+
+        //                         $("#messagescaninvalid").css('display', "block");
+        //                         $("#messagescansuccess").css('display', "none");
+        //                     }
+        //                 });
+        //             }
+        //         });
+        //     },
+
+        // });
 
 
         function generateControl() {
@@ -1296,7 +1429,7 @@
 
 
         function showreference() {
-            $("#supplierid, #editsupplierid, #locationid, #editlocationid, #brandid, #editbrandid, #typeid, #edittypeid, #unit, #category, #used,#checkoutemployeeid1").empty();
+            $("#supplierid, #editsupplierid, #locationid, #editlocationid, #brandid, #editbrandid, #typeid, #edittypeid, #unit, #category, #used, #depid, #typeofid,#checkoutemployeeid1").empty();
 
             //get all supplier
             $.ajax({
@@ -1566,9 +1699,40 @@
                         $("#editlocationid").append($("<option></option>")
                             .attr("value", id)
                             .text(name));
+
+
                     });
                     $("#locationid").append($("<option></option>")
                         .attr("value", "locationid")
+                        .text("Add New Data"));
+                }
+            });
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listdepartment')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    $("#depid").append($("<option></option>")
+                        .attr("value", "")
+                        .text(""));
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+                        $("#depid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+                        $("#editdepid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+
+                        $('#depid').trigger('change');
+                        $('#depid').select2();
+
+                    });
+                    $("#depid").append($("<option></option>")
+                        .attr("value", "depid")
                         .text("Add New Data"));
                 }
             });
@@ -1593,6 +1757,29 @@
                             .attr("value", id)
                             .text(name));
                     });
+
+                }
+            });
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listtypeofid')}}",
+                dataType: "JSON",
+                success: function(html) {
+                    var objs = html.message;
+                    jQuery.each(objs, function(index, record) {
+                        var id = decodeURIComponent(record.id);
+                        var name = decodeURIComponent(record.name);
+                        $("#typeofid").append($("<option></option>")
+                            .attr("value", id)
+                            .text(name));
+
+                        $('#typeofid').trigger('change');
+                        $('#typeofid').select2();
+
+                    });
+                    $("#typeofid").append($("<option></option>")
+                        .attr("value", "id")
+                        .text("Add New Data"));
 
                 }
             });
@@ -2127,8 +2314,7 @@
             const enrichedAssets = scannedAssets.map(asset => ({
                 ...asset,
                 controlno: $('#controlno').val(),
-                typeofid: $('#typeofid').val(),
-                idno: $('#idno').val(),
+                // typeofid: $('#typeofid').val(),
                 depid: $('#depid').val(),
                 condition: $('#core').val(),
                 used: $('#used').val(),
@@ -2137,7 +2323,7 @@
                 remarks: $('#remarks').val(),
                 employeeid: $('#checkoutemployeeid1').val(),
                 used: $('#used').val()
-                
+
 
             }));
             if (scannedAssets.length === 0) {
@@ -2276,7 +2462,7 @@
 
         $('#edit').on('hidden.bs.modal', function() {
             $("#editcontent").css('display', 'none');
-            $("#supplierid, #editsupplierid, #locationid, #editlocationid, #brandid, #editbrandid, #typeid, #edittypeid, #editcategory, #editunit,#unit, #category, #used,#checkoutemployeeid1").empty();
+            $("#supplierid, #editsupplierid, #locationid, #editlocationid, #brandid, #editbrandid, #typeid, #edittypeid, #editcategory, #editunit,#unit, #category, #used, #typeofid,#checkoutemployeeid1").empty();
 
         });
 
@@ -2310,8 +2496,7 @@
                                     let assetData = {
                                         ...data.message, // include all properties from the scanned asset
                                         controlno: $('#controlno').val(), // grab control number from input
-                                        typeofid: $('#typeofid').val(),
-                                        idno: $('#idno').val(),
+                                        // typeofid: $('#typeofid').val(),
                                         depid: $('#depid').val(),
                                         condition: $('#core').val(),
                                         used: $('#used').val(),
@@ -2396,7 +2581,7 @@
                                 if (data.assetstatus == "2") {
                                     alert("Asset is Turned In");
                                 } else if (data.assetstatus == "3") {
-                                    alert("Asset is Non-Operational");    
+                                    alert("Asset is Non-Operational");
                                 } else if (data.assetstatus == "4") {
                                     alert("Asset is Non-Serviceable");
                                 } else if (data.assetstatus == "5") {

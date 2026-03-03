@@ -132,6 +132,106 @@ class Asset extends Controller
      * @return object
      */
 
+    public function getGroupedAssets()
+    {
+        $data = DB::select("
+        SELECT 
+            a.name,
+            COUNT(*) as total,
+            (
+                SELECT picture 
+                FROM assets 
+                WHERE name = a.name 
+                AND picture IS NOT NULL 
+                LIMIT 1
+            ) as picture,
+            (
+                SELECT GROUP_CONCAT(assettag SEPARATOR ',') 
+                FROM assets 
+                WHERE name = a.name
+            ) as all_tags
+        FROM assets a
+        WHERE a.typeid != 7
+        GROUP BY a.name
+        ORDER BY a.name
+    ");
+
+        return Datatables::of($data)
+            ->addColumn('pictures', function ($row) {
+                $url = $row->picture ? url('/upload/assets/' . $row->picture) : url('/upload/assets/default.png');
+                return '<img src="' . $url . '" style="width:90px"/>';
+            })
+            ->addColumn('action', function ($row) {
+                return '<button class="btn btn-sm btn-info btn-show" data-name="' . $row->name . '">View Items</button>';
+            })
+            ->addColumn('all_tags', function ($row) {
+                return $row->all_tags; // 👈 important
+            })
+            ->rawColumns(['pictures', 'action'])
+            ->make(true);
+    }
+
+    public function getAssetsByName($name)
+    {
+        $data = DB::select("
+        SELECT 
+            assets.*, 
+            brand.name as brand, 
+            asset_type.name as type,
+            category.category as categoryname,
+            location.name as location,
+            ah.depid as depid,
+            ah.status as hstatus,
+            DATEDIFF(CURDATE(), assets.purchasedate) as number_of_days
+        FROM assets
+        LEFT JOIN brand ON assets.brandid = brand.id
+        LEFT JOIN asset_type ON assets.typeid = asset_type.id
+        LEFT JOIN category ON assets.category = category.id
+        LEFT JOIN location ON assets.locationid = location.id
+        LEFT JOIN (
+            SELECT a1.*
+            FROM asset_history a1
+            INNER JOIN (
+                SELECT assetid, MAX(id) as max_id
+                FROM asset_history
+                GROUP BY assetid
+            ) a2 ON a1.assetid = a2.assetid AND a1.id = a2.max_id
+        ) ah ON ah.assetid = assets.id
+        WHERE assets.name = ?
+    ", [$name]);
+
+        foreach ($data as $row) {
+
+            // // Add picture
+            // $row->pictures = $row->picture
+            //     ? '<img src="' . url('/') . '/upload/assets/' . $row->picture . '" style="width:60px"/>'
+            //     : '-';
+
+            // Add action dropdown
+            $row->action = '
+        <div class="btn-group">
+            <button class="btn btnconfirm btn-sm btn-primary dropdown-toggle" type="button" data-toggle="dropdown">
+                <i class="fa fa-ellipsis-h"></i>
+            </button>
+            <div class="dropdown-menu actionmenu">
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="' . url('/') . '/assetlist/detail/' . $row->id . '">
+                    <i class="fa fa-file-text"></i> Detail
+                </a>
+                <a class="dropdown-item" href="#" customdata=' . $row->id . ' data-toggle="modal" data-target="#edit">
+                    <i class="fa fa-pencil"></i> Edit
+                </a>
+                <a class="dropdown-item" href="#" customdata=' . $row->id . ' data-toggle="modal" data-target="#delete">
+                    <i class="fa fa-trash"></i> Delete
+                </a>
+            </div>
+        </div>';
+        }
+
+        return response()->json($data);
+    }
+
+
     public function historyassetbyid(Request $request)
     {
         $id            = $request->input('assetid');
@@ -603,7 +703,7 @@ class Asset extends Controller
         $employeeid     = $request->input('checkoutemployeeid1');
         $date           = $request->input('checkindate');
         $typeofid           = $request->input('typeofid');
-        $idno           = $request->input('idno');
+        // $idno           = $request->input('idno');
         $depid           = $request->input('depid');
         $core           = $request->input('core');
 
@@ -623,7 +723,7 @@ class Asset extends Controller
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
         $remarks        = $request->input('remarks');
-        $data           = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'typeofid' => $typeofid, 'idno' => $idno, 'depid' => $depid, 'condition' => $core, 'created_by' => $receiverby, 'control_number' => $controlno, 'created_at' => $created_at, 'updated_at' => $updated_at, 'remarks' => $remarks);
+        $data           = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'typeofid' => $typeofid, 'depid' => $depid, 'condition' => $core, 'created_by' => $receiverby, 'control_number' => $controlno, 'created_at' => $created_at, 'updated_at' => $updated_at, 'remarks' => $remarks);
         // $insert         = DB::table('asset_history')->insert($data);
         $insertId = DB::table('asset_history')->insertGetId($data);
         // dd($insertId);
@@ -658,8 +758,8 @@ class Asset extends Controller
         foreach ($assets as $asset) {
             $controlno = $asset['controlno'];
             $date = $asset['checkindate'];
-            $typeofid = $asset['typeofid'];
-            $idno = $asset['idno'];
+            // $typeofid = $asset['typeofid'];
+            // $idno = $asset['idno'];
             $depid = $asset['depid'];
             $condition = $asset['condition'];
             $used = $asset['used'];
@@ -702,8 +802,8 @@ class Asset extends Controller
                 'status'         => $status,
                 'employeeid'     => $employeeid,
                 'date'           => $date,
-                'typeofid'       => $typeofid,
-                'idno'           => $idno,
+                // 'typeofid'       => $typeofid,
+                // 'idno'           => $idno,
                 'depid'          => $depid,
                 'condition'      => $condition,
                 'used'           => $used,
@@ -796,10 +896,10 @@ class Asset extends Controller
 
         $pdf->Image(public_path('muntilogo.png'), 17, 5, 25, 25);
         $pdf->Image(public_path('drlogo.png'), 175, 5, 24, 24);
-        $pdf->Image(public_path('lowerline1.png'),0,277,216,3);
-        $pdf->Image(public_path('mun og.png'),180,260,30,15);
-      
-        
+        $pdf->Image(public_path('lowerline1.png'), 0, 277, 216, 3);
+        $pdf->Image(public_path('mun og.png'), 180, 260, 30, 15);
+
+
 
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetXY(0, 25);
@@ -872,83 +972,83 @@ class Asset extends Controller
         $pdf->SetFont('Arial', '', 10);
         $pdf->cell(78.5, 4, utf8_decode($first->contact_no), 'B', 1, 'L');
 
-//         $text = "I, _____________________________________, hereby claim total responsibility for the proper use and deployment of the
-// equipment and also it must be kept in good condition and must be kept clean at all times. I understand that if this piece 
-// of equipment is lost, stolen, damaged etc. I am responsible for its replacement or repair and also I must submit an incident
-// report outlining what occured during the incident.";
+        //         $text = "I, _____________________________________, hereby claim total responsibility for the proper use and deployment of the
+        // equipment and also it must be kept in good condition and must be kept clean at all times. I understand that if this piece 
+        // of equipment is lost, stolen, damaged etc. I am responsible for its replacement or repair and also I must submit an incident
+        // report outlining what occured during the incident.";
 
-//         $pdf->SetFont('Arial', 'B', 10);
-//         $pdf->SetXY(20, 93);
-//         $pdf->MultiCell(192, 4, $text, 0, 'J');
+        //         $pdf->SetFont('Arial', 'B', 10);
+        //         $pdf->SetXY(20, 93);
+        //         $pdf->MultiCell(192, 4, $text, 0, 'J');
 
-//         //Name
-//         $pdf->SetXY(24, 92.5);
-//         $pdf->cell(65, 4, utf8_decode($first->employeename), 0, 1, 'C');
+        //         //Name
+        //         $pdf->SetXY(24, 92.5);
+        //         $pdf->cell(65, 4, utf8_decode($first->employeename), 0, 1, 'C');
 
-//         $text = "The City Government of Muntinlupa, specially the DDRM, is not responsible for any legal violation may I committed during
-// the time of borrowing involving or using the described equipment.";
+        //         $text = "The City Government of Muntinlupa, specially the DDRM, is not responsible for any legal violation may I committed during
+        // the time of borrowing involving or using the described equipment.";
 
-//         $pdf->SetFont('Arial', 'B', 10);
-//         $pdf->SetXY(20, 115);
-//         $pdf->MultiCell(186, 4, $text, 0, 'J');
+        //         $pdf->SetFont('Arial', 'B', 10);
+        //         $pdf->SetXY(20, 115);
+        //         $pdf->MultiCell(186, 4, $text, 0, 'J');
 
 
-$pdf->SetXY(0, 95);
-$pdf->Cell(216, 4, 'Material/Equipment Requested', 0, 1, 'C');
+        $pdf->SetXY(0, 95);
+        $pdf->Cell(216, 4, 'Material/Equipment Requested', 0, 1, 'C');
 
-$pdf->SetXY(3, 105);
-$pdf->SetFillColor(164, 172, 124);
+        $pdf->SetXY(3, 105);
+        $pdf->SetFillColor(164, 172, 124);
 
-// Header row
-$pdf->Cell(8, 5, 'NO.', 1, 0, 'C', true);
-$pdf->Cell(50, 5, 'ITEM(S) DESCRIPTION', 1, 0, 'C', true);
-$pdf->Cell(28, 5, 'SERIAL NO.', 1, 0, 'C', true);
-$pdf->Cell(15, 5, 'QTY.', 1, 0, 'C', true);
-$pdf->Cell(25, 5, 'COST', 1, 0, 'C', true);
-$pdf->Cell(42, 5, 'PURPOSE', 1, 0, 'C', true);
-$pdf->Cell(42, 5, 'REMARKS', 1, 1, 'C', true);
+        // Header row
+        $pdf->Cell(8, 5, 'NO.', 1, 0, 'C', true);
+        $pdf->Cell(50, 5, 'ITEM(S) DESCRIPTION', 1, 0, 'C', true);
+        $pdf->Cell(28, 5, 'SERIAL NO.', 1, 0, 'C', true);
+        $pdf->Cell(15, 5, 'QTY.', 1, 0, 'C', true);
+        $pdf->Cell(25, 5, 'COST', 1, 0, 'C', true);
+        $pdf->Cell(42, 5, 'PURPOSE', 1, 0, 'C', true);
+        $pdf->Cell(42, 5, 'REMARKS', 1, 1, 'C', true);
 
-$counter = 1;
+        $counter = 1;
 
-foreach ($data as $item) {
-    $pdf->SetX(3);
+        foreach ($data as $item) {
+            $pdf->SetX(3);
 
-    // No.
-    $pdf->Cell(8, 6, $counter . '.', 1, 0, 'C');
+            // No.
+            $pdf->Cell(8, 6, $counter . '.', 1, 0, 'C');
 
-    // ITEM(S) DESCRIPTION
-    $assetname = utf8_decode($item->assetname);
-    $pdf->SetFont('Arial', '', (mb_strlen($assetname) > 17) ? 8 : 10);
-    $pdf->Cell(50, 6, $assetname, 1, 0, 'C');
-    $pdf->SetFont('Arial', '', 10);
+            // ITEM(S) DESCRIPTION
+            $assetname = utf8_decode($item->assetname);
+            $pdf->SetFont('Arial', '', (mb_strlen($assetname) > 17) ? 8 : 10);
+            $pdf->Cell(50, 6, $assetname, 1, 0, 'C');
+            $pdf->SetFont('Arial', '', 10);
 
-    // SERIAL NO.
-    $assettag = utf8_decode($item->assettag);
-    $pdf->SetFont('Arial', '', (mb_strlen($assettag) > 12) ? 8 : 10);
-    $pdf->Cell(28, 6, $assettag, 1, 0, 'C');
-    $pdf->SetFont('Arial', '', 10);
+            // SERIAL NO.
+            $assettag = utf8_decode($item->assettag);
+            $pdf->SetFont('Arial', '', (mb_strlen($assettag) > 12) ? 8 : 10);
+            $pdf->Cell(28, 6, $assettag, 1, 0, 'C');
+            $pdf->SetFont('Arial', '', 10);
 
-    // QTY.
-    $pdf->Cell(15, 6, '1', 1, 0, 'C');
+            // QTY.
+            $pdf->Cell(15, 6, '1', 1, 0, 'C');
 
-    // COST
-    $cost = utf8_decode($item->cost);
-    $pdf->Cell(25, 6, $cost, 1, 0, 'C');
+            // COST
+            $cost = utf8_decode($item->cost);
+            $pdf->Cell(25, 6, $cost, 1, 0, 'C');
 
-    // PURPOSE
-    $purpose = utf8_decode($item->used);
-    $pdf->SetFont('Arial', '', (mb_strlen($purpose) > 17) ? 8 : 10);
-    $pdf->Cell(42, 6, $purpose, 1, 0, 'C');
-    $pdf->SetFont('Arial', '', 10);
+            // PURPOSE
+            $purpose = utf8_decode($item->used);
+            $pdf->SetFont('Arial', '', (mb_strlen($purpose) > 17) ? 8 : 10);
+            $pdf->Cell(42, 6, $purpose, 1, 0, 'C');
+            $pdf->SetFont('Arial', '', 10);
 
-    // REMARKS
-    $remarks = utf8_decode($item->remarks);
-    $pdf->SetFont('Arial', '', (mb_strlen($remarks) > 17) ? 7 : 10);
-    $pdf->Cell(42, 6, $remarks, 1, 1, 'C');
-    $pdf->SetFont('Arial', '', 10);
+            // REMARKS
+            $remarks = utf8_decode($item->remarks);
+            $pdf->SetFont('Arial', '', (mb_strlen($remarks) > 17) ? 7 : 10);
+            $pdf->Cell(42, 6, $remarks, 1, 1, 'C');
+            $pdf->SetFont('Arial', '', 10);
 
-    $counter++;
-}
+            $counter++;
+        }
 
         // $pdf->SetX(20);
         // $pdf->cell(8, 6, '1.', 1, 0, 'C');
@@ -996,12 +1096,12 @@ foreach ($data as $item) {
 
 
         //signatories
-        $pdf->SetXY(20,150);
+        $pdf->SetXY(20, 150);
         $pdf->cell(20, 6, 'RECEIVED BY:', 0, 0, 'C');
         $pdf->cell(85, 6, '', 0, 0, 'C'); //Spacing lang eto adjust mo nalang
         $pdf->cell(20, 6, 'CHECKED BY:', 0, 0, 'C');
 
-        $pdf->SetXY(20,165);
+        $pdf->SetXY(20, 165);
         $pdf->cell(70, 6, utf8_decode($first->employeename), 'B', 0, 'C');
         $pdf->cell(40, 6, '', 0, 0, 'C'); //Spacing lang
         $pdf->cell(70, 6, 'ALMOND G. GREGORIO', 0, 1, 'C');
@@ -1014,13 +1114,13 @@ foreach ($data as $item) {
 
 
         //signatories
-        $pdf->SetXY(20,185);
+        $pdf->SetXY(20, 185);
         $pdf->cell(20, 6, 'ISSUED BY:', 0, 0, 'C');
         $pdf->cell(85, 6, '', 0, 0, 'C'); //Spacing lang
         $pdf->cell(20, 6, 'APPROVED BY:', 0, 0, 'C');
 
 
-        $pdf->SetXY(20,195);
+        $pdf->SetXY(20, 195);
         $pdf->cell(70, 6, utf8_decode($first->fullname), 'B', 0, 'C');
         $pdf->cell(40, 6, '', 0, 0, 'C'); //Spacing lang
         $pdf->cell(70, 6, 'ERWIN O. ALFONSO', 0, 1, 'C');
@@ -1136,7 +1236,6 @@ foreach ($data as $item) {
      *
      * @return object
      */
-
     public function generateControlNumber(Request $request)
     {
         $prefix = $request->get('prefix', 'BF'); // Optional prefix from frontend
@@ -1149,21 +1248,35 @@ foreach ($data as $item) {
             ->first();
 
         if ($last && isset($last->control_number)) {
-            // Extract the last number part
-            $parts = explode('-', $last->control_number);
-            $lastNumber = isset($parts[2]) ? (int)$parts[2] : 0;
-            $nextNumber = $lastNumber + 1;
+            if ($last->status == 2) {
+                // If last status = 2, increment number
+                $parts = explode('-', $last->control_number);
+                $lastNumber = isset($parts[2]) ? (int)$parts[2] : 0;
+                $nextNumber = $lastNumber + 1;
+            } else if ($last->status == 1) {
+                // If last status = 1, reuse the last control number
+                $nextNumber = null;
+                $controlNumber = $last->control_number;
+            } else {
+                // Optional: handle other statuses if needed
+                $parts = explode('-', $last->control_number);
+                $lastNumber = isset($parts[2]) ? (int)$parts[2] : 0;
+                $nextNumber = $lastNumber + 1;
+            }
         } else {
             $nextNumber = 1;
         }
 
-        $controlNumber = $prefix . '-' . $year . '-' . $nextNumber;
+        if (!isset($controlNumber)) {
+            $controlNumber = $prefix . '-' . $year . '-' . $nextNumber;
+        }
 
         return response()->json([
             'success' => true,
             'message' => $controlNumber
         ]);
     }
+
 
 
     // public function generateControlNumber($prefix)
