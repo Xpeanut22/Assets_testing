@@ -1044,7 +1044,7 @@ $pdf->Cell($wNo, $rowH, $rowNo.'.', 1, 0, 'C');
 
 // DESCRIPTION
 $assetname = utf8_decode($item->assetname ?? '');
-$pdf->SetFont('Arial', '', (mb_strlen($assetname) > 17) ? 8 : 10);
+$pdf->SetFont('Arial', '', (mb_strlen($assetname) > 17) ? 7 : 10);
 $pdf->Cell($wDesc, $rowH, $assetname, 1, 0, 'C');
 $pdf->SetFont('Arial', '', 10);
 
