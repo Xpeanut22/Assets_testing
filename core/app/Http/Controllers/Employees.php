@@ -223,7 +223,7 @@ class Employees extends Controller
 
         $id = $request->input('id');
 
-        $delete = DB::table('employee')->where('id', $id)->delete();
+        $delete = DB::table('employees')->where('id', $id)->delete();
 
         if ($delete) {
             $res['success'] = 'success';
