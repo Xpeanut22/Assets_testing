@@ -95,11 +95,11 @@
                     <div  class="display-none messageexist alert alert-success"><?php echo trans('lang.data_exist');?></div>
                     <div class="form-group">
                         <label>Category</label>
-                        <input name="editcategory" type="text" id="editcategory" class=" form-control" required placeholder="Category"/>
+                        <input name="category" type="text" id="editcategory" class="form-control" required>
                     </div>
                     <div class="form-group">
                         <label>Description</label>
-                        <input name="editdescription" type="text" id="editdescription" class=" form-control" required placeholder="Description"/>
+                        <input name="description" type="text" id="editdescription" class="form-control" required>
                     </div>
                     </div>
                     <div class="modal-footer">
@@ -261,7 +261,7 @@ $("#formadd").validate({
 $("#formedit").validate({
     submitHandler: function(form) {
         $.ajax({
-			method: "POST",
+            method: "POST",
             url: "{{ url('updatecategory')}}",
             data: $("#formedit").serialize(),
             dataType: "JSON",
@@ -275,7 +275,7 @@ $("#formedit").validate({
                     $(".messageexist").css({'display':"block"});
                 }
             }
-		});
+        });
     }
 });
 
@@ -300,19 +300,21 @@ $("#formdelete").validate({
 //show edit data
 $('#edit').on('show.bs.modal', function(e) {
     var $modal = $(this),
-    id = $(e.relatedTarget).attr('customdata');
-	$.ajax({
-		type: "POST",
-		url: "{{ url('categorybyid')}}",
-		data: {id:id},
-		dataType: "JSON",
-		success: function(data) {
-			$("#editid").val(id);
-            $("#editcategory").val(data.message.unit);
-            $("#editdescription").val(data.message.Description);
-		}   
-	});
+        id = $(e.relatedTarget).attr('customdata');
+
+    $.ajax({
+        type: "POST",
+        url: "{{ url('categorybyid') }}",
+        data: { id: id },
+        dataType: "JSON",
+        success: function(data) {
+            $("#editid").val(id);
+            $("#editcategory").val(data.message.category ?? data.message.Category ?? '');
+            $("#editdescription").val(data.message.description ?? data.message.Description ?? '');
+        }
+    });
 });
+
 
 //show delete data
 
