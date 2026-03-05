@@ -1104,16 +1104,52 @@
         }
 
 
-        function daylapse(checkstatus, updatedAt) {
-            if (checkstatus == 2) {
-                var currentDate = new Date();
-                var updatedDate = new Date(updatedAt); // Assuming updatedAt is a date string
-                var diffTime = Math.abs(currentDate - updatedDate);
-                var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Convert milliseconds to days
-                return diffDays + "/30";
-            } else {
+        function parseAssetDate(dateValue) {
+            if (!dateValue) return null;
+            var normalized = String(dateValue).trim();
+            if (normalized.length === 0) return null;
+
+            // Handle "YYYY-MM-DD HH:mm:ss" values by converting to ISO-like format.
+            if (normalized.indexOf(' ') > -1 && normalized.indexOf('T') === -1) {
+                normalized = normalized.replace(' ', 'T');
+            }
+
+            // Force Philippine time (UTC+08:00) when timestamp has no timezone info.
+            var hasTimezone = /Z$|[+\-]\d{2}:\d{2}$/.test(normalized);
+            if (!hasTimezone) {
+                normalized += "+08:00";
+            }
+
+            var parsed = new Date(normalized);
+            if (isNaN(parsed.getTime())) return null;
+            return parsed;
+        }
+
+        function daylapse(item) {
+            if (Number(item.checkstatus) !== 2) {
                 return "NA";
             }
+
+            var borrowedAtRaw = item.checkoutdate || item.checkout_date || item.borrowed_at || item.updated_at || item
+                .created_at;
+            var borrowedAt = parseAssetDate(borrowedAtRaw);
+            if (!borrowedAt) {
+                return "NA";
+            }
+
+            var now = new Date();
+            var diffTime = now.getTime() - borrowedAt.getTime();
+            if (diffTime < 0) {
+                return "0 hours ago";
+            }
+
+            var diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays < 1) {
+                var diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+                return diffHours + (diffHours === 1 ? " hour ago" : " hours ago");
+            }
+
+            return diffDays + (diffDays === 1 ? " day" : " days");
         }
 
         function historystatus(status, checkstatus) {
@@ -1200,7 +1236,7 @@
                         html += '<td>' + item.brand + '</td>';
                         html += '<td>' + item.location + '</td>';
                         html += '<td>' + assetstatusText(item.status) + '</td>';
-                        html += '<td>' + daylapse(item.checkstatus) + '</td>';
+                        html += '<td>' + daylapse(item) + '</td>';
                         html += '<td>' + historystatus(item.status, item.checkstatus) + '</td>';
                         html += '<td>' + item.action + '</td>';
                         html += '</tr>';
@@ -2453,8 +2489,9 @@
 
         $('#scanning').on('hidden.bs.modal', function() {
             $("#checkdata").hide();
-            $('#scannedItems').remove();
+            $('#scannedItems').empty();
             $("#scansearch").val("");
+            scannedAssets = [];
             $(this).removeData('bs.modal');
             $(this).find('form').trigger('reset');
             // $(this).find('.modal-body').html('');
@@ -2470,149 +2507,168 @@
         //show checkin
 
         let scannedAssets = [];
+        let scanSearchTimer = null;
+
+        function runAssetScanLookup(showEmptyAlert = false) {
+            generateControl();
+            const searchValue = $('#scansearch').val().trim();
+
+            if (searchValue.length > 0) {
+                $.ajax({
+                    type: "POST",
+                    url: "{{ url('assetbytag') }}",
+                    data: {
+                        receivedby: loggedInUserId,
+                        searchValue: searchValue
+                    },
+                    dataType: "JSON",
+                    success: function(data) {
+                        if (data.success === 'success' && data.message) {
+                            const assetId = data.message.assetid;
+
+                            // Check if asset already scanned
+                            const alreadyScanned = scannedAssets.some(item => item.assetid === assetId);
+                            if (!alreadyScanned) {
+                                // Clone the asset data and add additional form fields
+                                let assetData = {
+                                    ...data.message, // include all properties from the scanned asset
+                                    controlno: $('#controlno').val(), // grab control number from input
+                                    // typeofid: $('#typeofid').val(),
+                                    depid: $('#depid').val(),
+                                    condition: $('#core').val(),
+                                    used: $('#used').val(),
+                                    receivedby: loggedInUserId,
+                                    checkindate: $('#checkindate').val(),
+                                    remarks: $('#remarks').val(),
+                                    employeeid: $('#checkoutemployeeid1').val()
+                                };
+
+                                scannedAssets.push(assetData);
+                                // Add to visual list
+                                $('#scannedItems').append(`
+                                    <li class="list-group-item">
+                                        ${data.message.assetname} (${data.message.assettag})
+                                    </li>
+                                `);
+                            }
+
+                            // $("#savescan").show();
+                            $("#checkdata").show();
+
+                            $("#assetnumber").val(assetId);
+                            $("#checkinname").val(data.message.assetname);
+                            $("#checkinassettag").val(data.message.assettag);
+
+                            console.log(data.message.checkstatus);
+
+                            if (data.message.checkstatus == 0) {
+                                $("#borrowername").html("Borrowers Name");
+                                $("#personnelInCharge").html("Logistic Custodian:");
+                            } else {
+                                $("#borrowername").html("Returners Name");
+                                $("#dateid").html("Returned Date");
+                                $("#personnelInCharge").html("Logistic Custodian:");
+                            }
+                            $("#receivedby1").val(loggedInUserId);
+
+                            alert("Asset: " + data.message.assetname + "\nAsset Tag: " + data.message.assettag);
+                            $("#scansearch").val("");
+                        }
+
+                        // old scanning method
+                        // if (data.success === 'success' && data.message) {
+                        //     $("#savescan").show();
+                        //     $("#checkdata").show();
+
+                        //     $("#assetnumber").val(data.message.assetid);
+                        //     $("#checkinname").val(data.message.assetname);
+                        //     $("#checkinassettag").val(data.message.assettag);
+                        //     // if (data.message.efullname != "null") {
+                        //     //     $("#checkoutemployeeid1").val(data.message.ahemployeeid);
+                        //     // } else {
+                        //     //     $("#checkoutemployeeid1").val();
+                        //     // }
+                        //     if (data.message.checkstatus == 0) {
+                        //         $("#borrowername").html("Borrowers Name");
+                        //         // $("#dateid").html("Borrowed Date");
+                        //         // $("#returnerinput").hide();
+                        //         // $("#returnerinput1").hide();
+                        //         // $("#returnerinput2").hide();
+                        //         // $("#returnerinput3").hide();
+                        //         // $("#datediv").addClass("col-md-12");
+
+                        //     } else {
+                        //         $("#borrowername").html("Returners Name");
+                        //         $("#dateid").html("Returned Date");
+                        //         // $("#returnerinput").show();
+                        //         // $("#returnerinput1").show();
+                        //         // $("#returnerinput2").show();
+                        //         // $("#returnerinput3").show();
+                        //         // $("#datediv").removeClass();
+                        //         // $("#datediv").addClass("col-md-6");
+
+                        //     }
+                        //     $("#receivedby1").val(loggedInUserId);
+
+                        //     alert("Asset: " + data.message.assetname + "\nAsset Tag: " + data.message.assettag);
+                        // }
+                        else {
+                            $("#checkdata").hide();
+                            if (data.assetstatus == "2") {
+                                alert("Asset is Turned In");
+                            } else if (data.assetstatus == "3") {
+                                alert("Asset is Non-Operational");
+                            } else if (data.assetstatus == "4") {
+                                alert("Asset is Non-Serviceable");
+                            } else if (data.assetstatus == "5") {
+                                alert("Asset is Unserviceable");
+                            } else if (data.assetstatus == "6") {
+                                alert("Asset is Lost");
+                            } else if (data.assetstatus == "7") {
+                                alert("Asset is Out for Repair");
+                            } else if (data.assetstatus == "8") {
+                                alert("Asset is Out for Maintenance");
+                            }
+                            alert("No asset found with that ID or Tag.");
+                        }
+                        // assetstatus
+                        // 1 = operational
+                        // 2 = Turned In 
+                        // 3 = Non-Operational
+                        // 4 = Non-Serviceable
+                        // 5 = Unserviceable
+                        // 6 = Lost
+                        // 7 = Out for Repair
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("AJAX error:", status, error);
+                        alert("Error retrieving asset details. Please try again.");
+                    }
+                });
+            } else if (showEmptyAlert) {
+                alert("Please enter a valid asset ID or Tag.");
+            }
+        }
 
         $('#scansearch').on('keypress', function(e) {
-            generateControl();
             if (e.which === 13) {
-                var searchValue = $(this).val().trim();
-
-                if (searchValue.length > 0) {
-                    $.ajax({
-                        type: "POST",
-                        url: "{{ url('assetbytag') }}",
-                        data: {
-                            receivedby: loggedInUserId,
-                            searchValue: searchValue
-                        },
-                        dataType: "JSON",
-                        success: function(data) {
-                            if (data.success === 'success' && data.message) {
-                                const assetId = data.message.assetid;
-
-                                // Check if asset already scanned
-                                const alreadyScanned = scannedAssets.some(item => item.assetid === assetId);
-                                if (!alreadyScanned) {
-                                    // Clone the asset data and add additional form fields
-                                    let assetData = {
-                                        ...data.message, // include all properties from the scanned asset
-                                        controlno: $('#controlno').val(), // grab control number from input
-                                        // typeofid: $('#typeofid').val(),
-                                        depid: $('#depid').val(),
-                                        condition: $('#core').val(),
-                                        used: $('#used').val(),
-                                        receivedby: loggedInUserId,
-                                        checkindate: $('#checkindate').val(),
-                                        remarks: $('#remarks').val(),
-                                        employeeid: $('#checkoutemployeeid1').val(),
-                                        used: $('#used').val()
-
-                                    };
-
-                                    scannedAssets.push(assetData);
-                                    // Add to visual list
-                                    $('#scannedItems').append(`
-                                        <li class="list-group-item">
-                                            ${data.message.assetname} (${data.message.assettag})
-                                        </li>
-                                    `);
-                                }
-
-                                // $("#savescan").show();
-                                $("#checkdata").show();
-
-                                $("#assetnumber").val(assetId);
-                                $("#checkinname").val(data.message.assetname);
-                                $("#checkinassettag").val(data.message.assettag);
-
-                                console.log(data.message.checkstatus);
-
-                                if (data.message.checkstatus == 0) {
-                                    $("#borrowername").html("Borrowers Name");
-                                    $("#personnelInCharge").html("Logistic Custodian:");
-                                } else {
-                                    $("#borrowername").html("Returners Name");
-                                    $("#dateid").html("Returned Date");
-                                    $("personnelInCharge").html("Logistic Custodian:");
-                                }
-                                $("#receivedby1").val(loggedInUserId);
-
-                                alert("Asset: " + data.message.assetname + "\nAsset Tag: " + data.message.assettag);
-                            }
-
-                            // old scanning method
-                            // if (data.success === 'success' && data.message) {
-                            //     $("#savescan").show();
-                            //     $("#checkdata").show();
-
-                            //     $("#assetnumber").val(data.message.assetid);
-                            //     $("#checkinname").val(data.message.assetname);
-                            //     $("#checkinassettag").val(data.message.assettag);
-                            //     // if (data.message.efullname != "null") {
-                            //     //     $("#checkoutemployeeid1").val(data.message.ahemployeeid);
-                            //     // } else {
-                            //     //     $("#checkoutemployeeid1").val();
-                            //     // }
-                            //     if (data.message.checkstatus == 0) {
-                            //         $("#borrowername").html("Borrowers Name");
-                            //         // $("#dateid").html("Borrowed Date");
-                            //         // $("#returnerinput").hide();
-                            //         // $("#returnerinput1").hide();
-                            //         // $("#returnerinput2").hide();
-                            //         // $("#returnerinput3").hide();
-                            //         // $("#datediv").addClass("col-md-12");
-
-                            //     } else {
-                            //         $("#borrowername").html("Returners Name");
-                            //         $("#dateid").html("Returned Date");
-                            //         // $("#returnerinput").show();
-                            //         // $("#returnerinput1").show();
-                            //         // $("#returnerinput2").show();
-                            //         // $("#returnerinput3").show();
-                            //         // $("#datediv").removeClass();
-                            //         // $("#datediv").addClass("col-md-6");
-
-                            //     }
-                            //     $("#receivedby1").val(loggedInUserId);
-
-                            //     alert("Asset: " + data.message.assetname + "\nAsset Tag: " + data.message.assettag);
-                            // }
-                            else {
-                                $("#checkdata").hide();
-                                if (data.assetstatus == "2") {
-                                    alert("Asset is Turned In");
-                                } else if (data.assetstatus == "3") {
-                                    alert("Asset is Non-Operational");
-                                } else if (data.assetstatus == "4") {
-                                    alert("Asset is Non-Serviceable");
-                                } else if (data.assetstatus == "5") {
-                                    alert("Asset is Unserviceable");
-                                } else if (data.assetstatus == "6") {
-                                    alert("Asset is Lost");
-                                } else if (data.assetstatus == "7") {
-                                    alert("Asset is Out for Repair");
-                                } else if (data.assetstatus == "8") {
-                                    alert("Asset is Out for Maintenance");
-                                }
-                                alert("No asset found with that ID or Tag.");
-                            }
-                            // assetstatus
-                            // 1 = operational
-                            // 2 = Turned In 
-                            // 3 = Non-Operational
-                            // 4 = Non-Serviceable
-                            // 5 = Unserviceable
-                            // 6 = Lost
-                            // 7 = Out for Repair
-                        },
-                        error: function(xhr, status, error) {
-                            console.error("AJAX error:", status, error);
-                            alert("Error retrieving asset details. Please try again.");
-                        }
-                    });
-                } else {
-                    alert("Please enter a valid asset ID or Tag.");
+                e.preventDefault();
+                if (scanSearchTimer) {
+                    clearTimeout(scanSearchTimer);
                 }
+                runAssetScanLookup(true);
             }
+        });
+
+        $('#scansearch').on('input', function() {
+            if (scanSearchTimer) {
+                clearTimeout(scanSearchTimer);
+            }
+
+            // Auto-search after scanner/user input settles, even without Enter key.
+            scanSearchTimer = setTimeout(function() {
+                runAssetScanLookup(false);
+            }, 250);
         });
 
 

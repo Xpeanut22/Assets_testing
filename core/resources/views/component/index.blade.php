@@ -1193,7 +1193,7 @@
                     title: 'Component Name'
                 },
                 {
-                    data: 'all_controls',
+                    data: 'all_serials',
                     visible: false,
                     searchable: true
                 },
@@ -2237,48 +2237,74 @@
             $("#iddelete").val(id);
         });
         let scannedComponents = [];
+        let batchScanSearchTimer = null;
+        let isBatchLookupInFlight = false;
 
-        $('#scansearchbatch').on('keypress', function(e) {
+        function resolveAvailableQuantity(data) {
+            const messageData = data && data.message ? data.message : {};
+            const fromMessageQty = parseInt(messageData.quantity, 10);
+            const fromMessageAvailable = parseInt(messageData.available_quantity, 10);
+            const fromRootAvailable = parseInt(data && data.available_quantity, 10);
+            const fromRootQty = parseInt(data && data.quantity, 10);
+            const resolved = !Number.isNaN(fromMessageAvailable) ? fromMessageAvailable :
+                !Number.isNaN(fromMessageQty) ? fromMessageQty :
+                !Number.isNaN(fromRootAvailable) ? fromRootAvailable :
+                !Number.isNaN(fromRootQty) ? fromRootQty : 0;
 
-            if (e.which === 13) {
-                e.preventDefault();
+            return Math.max(0, resolved);
+        }
 
-                let searchValue = $(this).val().trim();
-                if (!searchValue) return;
+        function runBatchComponentLookup(showEmptyAlert = false) {
+            if (isBatchLookupInFlight) return;
 
-                $.ajax({
-                    type: "POST",
-                    url: "{{ url('componentBySerial') }}",
-                    data: {
-                        receivedby: loggedInUserId,
-                        searchValue: searchValue
-                    },
-                    dataType: "JSON",
-                    success: function(data) {
+            let searchValue = $('#scansearchbatch').val().trim();
+            if (!searchValue) {
+                if (showEmptyAlert) {
+                    alert("Please enter a valid serial.");
+                }
+                return;
+            }
 
-                        if (data.success === 'success' && data.message) {
+            isBatchLookupInFlight = true;
 
-                            const assetId = data.message.serial;
+            $.ajax({
+                type: "POST",
+                url: "{{ url('componentBySerial') }}",
+                data: {
+                    receivedby: loggedInUserId,
+                    searchValue: searchValue
+                },
+                dataType: "JSON",
+                success: function(data) {
+                    if (data.success === 'success' && data.message) {
+                        const assetId = data.message.serial;
+                        const dbQuantity = resolveAvailableQuantity(data);
 
-                            const alreadyScanned = scannedComponents.some(
-                                item => item.serial === assetId
-                            );
+                        if (dbQuantity <= 0) {
+                            alert("Component is already issued.");
+                            $('#scansearchbatch').val('').focus();
+                            return;
+                        }
 
-                            if (alreadyScanned) {
-                                alert("Component already scanned.");
-                                return;
-                            }
+                        const alreadyScanned = scannedComponents.some(
+                            item => item.serial === assetId
+                        );
 
-                            const dbQuantity = parseInt(data.message.quantity, 10) || 1;
-                            const isEditableQuantity = dbQuantity > 1;
+                        if (alreadyScanned) {
+                            alert("Component already scanned.");
+                            $('#scansearchbatch').val('').focus();
+                            return;
+                        }
 
-                            scannedComponents.push({
-                                ...data.message,
-                                available_quantity: dbQuantity,
-                                requested_quantity: 1
-                            });
+                        const isEditableQuantity = dbQuantity > 1;
 
-                            $('#scannedBatchTable tbody').append(`
+                        scannedComponents.push({
+                            ...data.message,
+                            available_quantity: dbQuantity,
+                            requested_quantity: 1
+                        });
+
+                        $('#scannedBatchTable tbody').append(`
                         <tr data-id="${assetId}">
                             <td>${data.message.serial}</td>
                             <td>${data.message.name}</td>
@@ -2301,18 +2327,40 @@
                         </tr>
                     `);
 
-                            $('#scansearchbatch').val('').focus();
+                        $('#scansearchbatch').val('').focus();
+                    } else {
+                        if (data.message === 'already_issued') {
+                            alert("Component is already issued.");
                         } else {
-
-                            if (data.message === 'already_issued') {
-                                alert("Component is already issued.");
-                            } else {
-                                alert("Component not available.");
-                            }
+                            alert("Component not available.");
                         }
                     }
-                });
+                },
+                complete: function() {
+                    isBatchLookupInFlight = false;
+                }
+            });
+        }
+
+        $('#scansearchbatch').on('keypress', function(e) {
+            if (e.which === 13) {
+                e.preventDefault();
+                if (batchScanSearchTimer) {
+                    clearTimeout(batchScanSearchTimer);
+                }
+                runBatchComponentLookup(true);
             }
+        });
+
+        $('#scansearchbatch').on('input', function() {
+            if (batchScanSearchTimer) {
+                clearTimeout(batchScanSearchTimer);
+            }
+
+            // Auto-search after scanner input settles, even without Enter.
+            batchScanSearchTimer = setTimeout(function() {
+                runBatchComponentLookup(false);
+            }, 250);
         });
 
         $(document).on('click', '.remove-scan', function() {

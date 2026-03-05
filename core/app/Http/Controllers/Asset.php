@@ -1008,138 +1008,230 @@ class Asset extends Controller
         $pdf->Cell(42, 5, 'PURPOSE', 1, 0, 'C', true);
         $pdf->Cell(42, 5, 'REMARKS', 1, 1, 'C', true);
 
-        $counter = 1;
+        // =========================
+// TABLE + PAGINATION (Fixed 5 rows, max 10 on page 1)
+// =========================
+$tableX = 3;
+$firstPageStartY = 105;     // header row Y (same as yours)
+$nextPageStartY  = 40;      // adjust if page 2 has header images; 40 is common
+$headerH = 5;
+$rowH = 6;
 
-        foreach ($data as $item) {
-            $pdf->SetX(3);
+$fixedRowsP1 = 5;
+$maxRowsP1   = 10;
 
-            // No.
-            $pdf->Cell(8, 6, $counter . '.', 1, 0, 'C');
+// Column widths (same as yours)
+$wNo=8; $wDesc=50; $wSerial=28; $wQty=15; $wCost=25; $wPurpose=42; $wRemarks=42;
 
-            // ITEM(S) DESCRIPTION
-            $assetname = utf8_decode($item->assetname);
-            $pdf->SetFont('Arial', '', (mb_strlen($assetname) > 17) ? 8 : 10);
-            $pdf->Cell(50, 6, $assetname, 1, 0, 'C');
-            $pdf->SetFont('Arial', '', 10);
+$drawHeader = function() use ($pdf,$tableX,$headerH,$wNo,$wDesc,$wSerial,$wQty,$wCost,$wPurpose,$wRemarks) {
+    $pdf->SetX($tableX);
+    $pdf->SetFillColor(164, 172, 124);
+    $pdf->SetFont('Arial', 'B', 10);
 
-            // SERIAL NO.
-            $assettag = utf8_decode($item->assettag);
-            $pdf->SetFont('Arial', '', (mb_strlen($assettag) > 12) ? 8 : 10);
-            $pdf->Cell(28, 6, $assettag, 1, 0, 'C');
-            $pdf->SetFont('Arial', '', 10);
+    $pdf->Cell($wNo, $headerH, 'NO.', 1, 0, 'C', true);
+    $pdf->Cell($wDesc, $headerH, 'ITEM(S) DESCRIPTION', 1, 0, 'C', true);
+    $pdf->Cell($wSerial, $headerH, 'SERIAL NO.', 1, 0, 'C', true);
+    $pdf->Cell($wQty, $headerH, 'QTY.', 1, 0, 'C', true);
+    $pdf->Cell($wCost, $headerH, 'COST', 1, 0, 'C', true);
+    $pdf->Cell($wPurpose, $headerH, 'PURPOSE', 1, 0, 'C', true);
+    $pdf->Cell($wRemarks, $headerH, 'REMARKS', 1, 1, 'C', true);
 
-            // QTY.
-            $pdf->Cell(15, 6, '1', 1, 0, 'C');
+    $pdf->SetFont('Arial', '', 10);
+};
 
-            // COST
-            $cost = utf8_decode($item->cost);
-            $pdf->Cell(25, 6, $cost, 1, 0, 'C');
+$drawRow = function($rowNo, $item) use ($pdf,$tableX,$rowH,$wNo,$wDesc,$wSerial,$wQty,$wCost,$wPurpose,$wRemarks) {
+    $pdf->SetX($tableX);
+    $pdf->Cell($wNo, $rowH, $rowNo.'.', 1, 0, 'C');
 
-            // PURPOSE
-            $purpose = utf8_decode($item->used);
-            $pdf->SetFont('Arial', '', (mb_strlen($purpose) > 17) ? 8 : 10);
-            $pdf->Cell(42, 6, $purpose, 1, 0, 'C');
-            $pdf->SetFont('Arial', '', 10);
+    // DESCRIPTION
+    $assetname = utf8_decode($item->assetname ?? '');
+    $pdf->SetFont('Arial', '', (mb_strlen($assetname) > 17) ? 8 : 10);
+    $pdf->Cell($wDesc, $rowH, $assetname, 1, 0, 'C');
+    $pdf->SetFont('Arial', '', 10);
 
-            // REMARKS
-            $remarks = utf8_decode($item->remarks);
-            $pdf->SetFont('Arial', '', (mb_strlen($remarks) > 17) ? 7 : 10);
-            $pdf->Cell(42, 6, $remarks, 1, 1, 'C');
-            $pdf->SetFont('Arial', '', 10);
+    // SERIAL
+    $assettag = utf8_decode($item->assettag ?? '');
+    $pdf->SetFont('Arial', '', (mb_strlen($assettag) > 12) ? 8 : 10);
+    $pdf->Cell($wSerial, $rowH, $assettag, 1, 0, 'C');
+    $pdf->SetFont('Arial', '', 10);
 
-            $counter++;
+    // QTY
+    $pdf->Cell($wQty, $rowH, '1', 1, 0, 'C');
+
+    // COST
+    $cost = utf8_decode($item->cost ?? '');
+    $pdf->Cell($wCost, $rowH, $cost, 1, 0, 'C');
+
+    // PURPOSE
+    $purpose = utf8_decode($item->used ?? '');
+    $pdf->SetFont('Arial', '', (mb_strlen($purpose) > 17) ? 8 : 10);
+    $pdf->Cell($wPurpose, $rowH, $purpose, 1, 0, 'C');
+    $pdf->SetFont('Arial', '', 10);
+
+    // REMARKS
+    $remarks = utf8_decode($item->remarks ?? '');
+    $pdf->SetFont('Arial', '', (mb_strlen($remarks) > 17) ? 7 : 10);
+    $pdf->Cell($wRemarks, $rowH, $remarks, 1, 1, 'C');
+    $pdf->SetFont('Arial', '', 10);
+};
+
+$drawBlankRow = function($rowNo) use ($pdf,$tableX,$rowH,$wNo,$wDesc,$wSerial,$wQty,$wCost,$wPurpose,$wRemarks) {
+    $pdf->SetX($tableX);
+    $pdf->Cell($wNo, $rowH, $rowNo.'.', 1, 0, 'C');
+    $pdf->Cell($wDesc, $rowH, '', 1, 0, 'C');
+    $pdf->Cell($wSerial, $rowH, '', 1, 0, 'C');
+    $pdf->Cell($wQty, $rowH, '', 1, 0, 'C');
+    $pdf->Cell($wCost, $rowH, '', 1, 0, 'C');
+    $pdf->Cell($wPurpose, $rowH, '', 1, 0, 'C');
+    $pdf->Cell($wRemarks, $rowH, '', 1, 1, 'C');
+};
+
+$printFooter = function() use ($pdf) {
+    $pdf->SetXY(160, 345);
+    $pdf->SetFont('Arial', '', 9);
+    $pdf->Cell(50, 6, 'CGM-OP-MCDRRM-01F1', 0, 0, 'C');
+};
+
+$drawSignatories = function($signY) use ($pdf,$first) {
+
+    $receivedLabel = ($first->status == 1) ? 'RECEIVED BY:' : 'RETURNED BY:';
+
+    // Top row
+    $pdf->SetXY(20, $signY);
+    $pdf->SetFont('Arial', 'B', 10);
+    $pdf->Cell(70, 6, $receivedLabel, 0, 0, 'L');
+    $pdf->Cell(40, 6, '', 0, 0, 'C');
+    $pdf->Cell(70, 6, 'CHECKED BY:', 0, 1, 'L');
+
+    $pdf->SetX(20);
+    $pdf->SetFont('Arial', '', 10);
+    $pdf->Cell(70, 6, utf8_decode($first->employeename), 'B', 0, 'C');
+    $pdf->Cell(40, 6, '', 0, 0, 'C');
+    $pdf->Cell(70, 6, 'ALMOND G. GREGORIO', 0, 1, 'C');
+
+    $pdf->SetX(20);
+    $pdf->SetFont('Arial', '', 9);
+    $pdf->Cell(70, 6, 'Signature Over Printed Name', 0, 0, 'C');
+    $pdf->Cell(40, 6, '', 0, 0, 'C');
+    $pdf->Cell(70, 6, 'Section Head - Logistic', 0, 1, 'C');
+
+    // Bottom row
+    $pdf->Ln(10);
+    $pdf->SetX(20);
+    $pdf->SetFont('Arial', 'B', 10);
+    $pdf->Cell(70, 6, 'ISSUED BY:', 0, 0, 'L');
+    $pdf->Cell(40, 6, '', 0, 0, 'C');
+
+    // ✅ Your rule: on RETURN remove NOTED BY
+    if ($first->status == 1) {
+        $pdf->Cell(70, 6, 'NOTED BY:', 0, 1, 'L');
+    } else {
+        $pdf->Cell(70, 6, '', 0, 1, 'L');
+    }
+
+    $pdf->SetX(20);
+    $pdf->SetFont('Arial', '', 10);
+    $pdf->Cell(70, 6, utf8_decode($first->fullname), 'B', 0, 'C');
+    $pdf->Cell(40, 6, '', 0, 0, 'C');
+
+    if ($first->status == 1) {
+        $pdf->Cell(70, 6, 'ERWIN O. ALFONSO', 0, 1, 'C');
+    } else {
+        $pdf->Cell(70, 6, '', 0, 1, 'C');
+    }
+
+    $pdf->SetX(20);
+    $pdf->SetFont('Arial', '', 9);
+    $pdf->Cell(70, 6, 'Signature Over Printed Name', 0, 0, 'C');
+    $pdf->Cell(40, 6, '', 0, 0, 'C');
+
+    if ($first->status == 1) {
+        $pdf->Cell(70, 6, 'Department Head - DDRM', 0, 1, 'C');
+    } else {
+        $pdf->Cell(70, 6, '', 0, 1, 'C');
+    }
+};
+
+// -------------------------
+// Print page 1 rows
+// -------------------------
+$total = count($data);
+$index = 0;
+
+// how many rows to draw on page 1
+$dataP1 = min($total, $maxRowsP1);
+$rowsToDrawP1 = max($fixedRowsP1, $dataP1);
+
+// Print data rows (up to 10), then blanks to reach fixed/needed rows
+$rowNo = 1;
+for ($i = 0; $i < $rowsToDrawP1; $i++) {
+    if ($i < $dataP1) {
+        $drawRow($rowNo, $data[$index]);
+        $index++;
+    } else {
+        $drawBlankRow($rowNo);
+    }
+    $rowNo++;
+}
+
+// Always footer on page 1
+$printFooter();
+
+// -------------------------
+// If more data, continue on next pages (no max 10 limit)
+// -------------------------
+if ($index < $total) {
+
+    while ($index < $total) {
+        $pdf->AddPage();
+        $pdf->SetAutoPageBreak(FALSE);
+
+        // You likely want your background/footer images again on new pages if needed.
+        // If you need the same footer images, repeat $pdf->Image(...) here.
+
+        // Table header on new page
+        $pdf->SetXY($tableX, $nextPageStartY);
+        $drawHeader();
+
+        // Start printing rows on page 2+
+        // Compute how many rows fit before the footer/sign area.
+        // Keep this safe value; adjust if you want more rows per page.
+        $maxRowsThisPage = 24;
+
+        $printedThisPage = 0;
+        while ($index < $total && $printedThisPage < $maxRowsThisPage) {
+            $drawRow($rowNo, $data[$index]);
+            $index++;
+            $rowNo++;
+            $printedThisPage++;
         }
 
-        // $pdf->SetX(20);
-        // $pdf->cell(8, 6, '1.', 1, 0, 'C');
-        // $pdf->cell(70, 6, utf8_decode($data->assetname), 1, 0, 'C');
-        // $pdf->cell(20, 6, utf8_decode($data->assettag), 1, 0, 'C');
-        // $pdf->cell(15, 6, utf8_decode('1'), 1, 0, 'C');
-        // $pdf->cell(20, 6, utf8_decode(''), 1, 0, 'C');
-        // $pdf->cell(52, 6, utf8_decode($data->remarks), 1, 1, 'C');
+        // Footer on every page
+        $printFooter();
 
-        $pdf->SetX(3);
-        $pdf->cell(8, 6, '2.', 1, 0, 'C');
-        $pdf->cell(50, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(28, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(15, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(25, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 1, 'C');
-
-        $pdf->SetX(3);
-        $pdf->cell(8, 6, '3.', 1, 0, 'C');
-        $pdf->cell(50, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(28, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(15, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(25, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 1, 'C');
-
-        $pdf->SetX(3);
-        $pdf->cell(8, 6, '4.', 1, 0, 'C');
-        $pdf->cell(50, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(28, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(15, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(25, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 1, 'C');
-
-        $pdf->SetX(3);
-        $pdf->cell(8, 6, '5.', 1, 0, 'C');
-        $pdf->cell(50, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(28, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(15, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(25, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 0, 'C');
-        $pdf->cell(42, 6, utf8_decode(''), 1, 1, 'C');
-
-
-        //signatories
-        $pdf->SetXY(20, 150);
-        $pdf->cell(20, 6, 'RECEIVED BY:', 0, 0, 'C');
-        $pdf->cell(85, 6, '', 0, 0, 'C'); //Spacing lang eto adjust mo nalang
-        $pdf->cell(20, 6, 'CHECKED BY:', 0, 0, 'C');
-
-        $pdf->SetXY(20, 165);
-        $pdf->cell(70, 6, utf8_decode($first->employeename), 'B', 0, 'C');
-        $pdf->cell(40, 6, '', 0, 0, 'C'); //Spacing lang
-        $pdf->cell(70, 6, 'ALMOND G. GREGORIO', 0, 1, 'C');
-        // $pdf->Cell(70, 6, strtoupper($userName), 0, 1, 'C');
-
-        $pdf->SetX(20);
-        $pdf->cell(70, 6, 'Signature Over Printed Name', 0, 0, 'C');
-        $pdf->cell(40, 6, '', 0, 0, 'C'); //Spacing lang
-        $pdf->cell(70, 6, 'Section Head - Logistic', 0, 1, 'C');
-
-
-        //signatories
-        $pdf->SetXY(20, 185);
-        $pdf->cell(20, 6, 'ISSUED BY:', 0, 0, 'C');
-        $pdf->cell(85, 6, '', 0, 0, 'C'); //Spacing lang
-        $pdf->cell(20, 6, 'APPROVED BY:', 0, 0, 'C');
-
-
-        $pdf->SetXY(20, 195);
-        $pdf->cell(70, 6, utf8_decode($first->fullname), 'B', 0, 'C');
-        $pdf->cell(40, 6, '', 0, 0, 'C'); //Spacing lang
-        $pdf->cell(70, 6, 'ERWIN O. ALFONSO', 0, 1, 'C');
-
-        $pdf->SetX(20);
-        $pdf->cell(70, 6, 'Signature Over Printed Name', 0, 0, 'C');
-        $pdf->cell(40, 6, '', 0, 0, 'C'); //Spacing lang
-        $pdf->cell(70, 6, 'Department Head - DDRM', 0, 1, 'C');
-
-
-        $pdf->SetXY(160, 345);
-        $pdf->cell(50, 6, 'CGM-OP-MCDRRM-01F1', 0, 0, 'C');
-        $filename = ($first->status == 1 ? 'borrowers_form_' : 'returners_form_') . $id . '.pdf';
-        $pdf->Output('I', $filename, true);
-
-        return response($pdf->Output('S'))
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+        // If this was the last page, put signatories under last printed row
+        if ($index >= $total) {
+            $tableBottomY = $nextPageStartY + $headerH + ($printedThisPage * $rowH);
+            $signY = $tableBottomY + 8;
+            $drawSignatories($signY);
+        }
     }
+
+} else {
+    // No extra pages; signatories below page 1 table
+    $tableBottomY = $firstPageStartY + $headerH + ($rowsToDrawP1 * $rowH);
+    $signY = $tableBottomY + 8;
+    $drawSignatories($signY);
+}
+
+$filename = (($first->status == 1)
+    ? 'borrowers_form_'
+    : 'returners_form_') . $id . '.pdf';
+
+return response($pdf->Output('S'), 200)
+    ->header('Content-Type', 'application/pdf')
+    ->header('Content-Disposition', 'inline; filename="'.$filename.'"');
+}
 
     /**
      * insert checkin data  to database

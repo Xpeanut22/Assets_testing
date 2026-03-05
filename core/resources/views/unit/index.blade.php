@@ -95,11 +95,11 @@
                     <div  class="display-none messageexist alert alert-success"><?php echo trans('lang.data_exist');?></div>
                     <div class="form-group">
                         <label>Unit</label>
-                        <input name="editunit" type="text" id="editunit" class=" form-control" required placeholder="Unit"/>
+                        <input name="unit" type="text" id="editunit" class="form-control">
                     </div>
                     <div class="form-group">
                         <label>Description</label>
-                        <input name="editdescription" type="text" id="editdescription" class=" form-control" required placeholder="Description"/>
+                        <input name="description" type="text" id="editdescription" class="form-control">        
                     </div>
                     </div>
                     <div class="modal-footer">
@@ -307,10 +307,10 @@ $('#edit').on('show.bs.modal', function(e) {
 		data: {id:id},
 		dataType: "JSON",
 		success: function(data) {
-			$("#editid").val(id);
-            $("#editunit").val(data.message.unit);
-            $("#editdescription").val(data.message.Description);
-		}   
+        $("#editid").val(id);
+        $("#editunit").val(data.message.unit);
+        $("#editdescription").val(data.message.description ?? data.message.Description ?? '');
+        }
 	});
 });
 

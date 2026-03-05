@@ -170,6 +170,11 @@ class Component extends Controller
                 LIMIT 1
             ) as picture,
             (
+                SELECT GROUP_CONCAT(serial SEPARATOR ',')
+                FROM component
+                WHERE name = c.name
+            ) as all_serials,
+            (
                 SELECT GROUP_CONCAT(control_number SEPARATOR ',')
                 FROM component_assets ca
                 LEFT JOIN component cc ON cc.id = ca.componentid
@@ -192,6 +197,9 @@ class Component extends Controller
             ->addColumn('action', function ($row) {
                 return '<button class="btn btn-sm btn-info btn-show-component" data-name="'
                     . $row->name . '">View Items</button>';
+            })
+            ->addColumn('all_serials', function ($row) {
+                return $row->all_serials;
             })
             ->addColumn('all_controls', function ($row) {
                 return $row->all_controls;
@@ -1241,43 +1249,50 @@ class Component extends Controller
 
         $data = DB::table('component')
             ->select('component.*')
-            ->leftJoin('component_assets', 'component.id', '=', 'component_assets.componentid')
-            ->leftJoin('brand', 'brand.id', '=', 'component.brandid')
-            ->leftJoin('supplier', 'supplier.id', '=', 'component.supplierid')
-            ->leftJoin('asset_type', 'asset_type.id', '=', 'component.typeid')
             ->where('component.serial', $serial)
             ->first();
 
-        if ($data) {
+        if (!$data) {
+            return response()->json([
+                'success' => 'failed',
+                'message' => 'not_found'
+            ]);
+        }
 
-            if ($data->checkstatus == 2) {
-                return response()->json([
-                    'success' => 'failed',
-                    'message' => 'already_issued'
-                ]);
-            }
-
-            // ✅ If available
-            if ($data->status == 1) {
-                return response()->json([
-                    'success' => 'success',
-                    'message' => $data
-                ]);
-            }
-
-            // ❌ Other status
+        if ((int)$data->status !== 1) {
             return response()->json([
                 'success' => 'failed',
                 'componentstatus' => $data->status
             ]);
         }
 
+        $issuedQuantity = (int) DB::table('component_assets')
+            ->where('componentid', $data->id)
+            ->where('status', 1)
+            ->sum('quantity');
+
+        $totalQuantity = (int) $data->quantity;
+        $availableQuantity = max(0, $totalQuantity - $issuedQuantity);
+
+        $data->total_quantity = $totalQuantity;
+        $data->issued_quantity = $issuedQuantity;
+        $data->available_quantity = $availableQuantity;
+
+        if ($availableQuantity <= 0) {
+            return response()->json([
+                'success' => 'failed',
+                'message' => 'already_issued',
+                'available_quantity' => 0,
+                'total_quantity' => $totalQuantity,
+                'issued_quantity' => $issuedQuantity
+            ]);
+        }
+
         return response()->json([
-            'success' => 'failed',
-            'message' => 'not_found'
+            'success' => 'success',
+            'message' => $data
         ]);
     }
-
     public function assetsbyid(Request $request)
     {
         $id            = $request->input('assetid');
@@ -1444,3 +1459,4 @@ class Component extends Controller
         return response($res);
     }
 }
+
