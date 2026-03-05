@@ -315,7 +315,6 @@ $('#edit').on('show.bs.modal', function(e) {
     });
 });
 
-
 //show delete data
 
 $('#delete').on('show.bs.modal', function(e) {

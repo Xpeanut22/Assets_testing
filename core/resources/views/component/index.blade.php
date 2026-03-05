@@ -661,7 +661,7 @@
 
 
                     <div class="modal-header">
-                        <h5 class="modal-title"><?php echo trans('lang.issue'); ?> (Batch)</h5>
+                        <h5 class="modal-title"><?php echo trans('lang.scan_data'); ?> (Batch)</h5>
                         <button type="button" class="reloaddata ml-3 badge badge-data text-white background-green">
                             Reload
                         </button>

@@ -91,8 +91,6 @@
                         <h5 class="modal-title"><?php echo trans('lang.edit_data');?></h5>
                         <button type="button" class="close" data-dismiss="modal">&times;</button>
                     </div>
-
-                    <!--edit by harvey -->
                     <div class="modal-body">
                     <div  class="display-none messageexist alert alert-success"><?php echo trans('lang.data_exist');?></div>
                     <div class="form-group">
@@ -104,22 +102,6 @@
                         <input name="description" type="text" id="editdescription" class="form-control">        
                     </div>
                     </div>
-
-    <div class="display-none messageexist alert alert-success">
-        <?php echo trans('lang.data_exist');?>
-    </div>
-
-    <div class="form-group">
-        <label>Unit</label>
-        <input name="unit" type="text" id="editunit" class="form-control" required placeholder="Unit"/>
-    </div>
-
-    <div class="form-group">
-        <label>Description</label>
-        <input name="description" type="text" id="editdescription" class="form-control" required placeholder="Description"/>
-    </div>
-</div>
-<!--edit by harvey -->
                     <div class="modal-footer">
                         <input type="hidden" name="id" id="editid"/>
                         <button type="submit" class="btn btn-primary"
@@ -314,7 +296,7 @@ $("#formdelete").validate({
 		});
     }
 });
-// <!--edit by harvey -->
+
 //show edit data
 $('#edit').on('show.bs.modal', function(e) {
     var $modal = $(this),
@@ -330,19 +312,6 @@ $('#edit').on('show.bs.modal', function(e) {
         $("#editdescription").val(data.message.description ?? data.message.Description ?? '');
         }
 	});
-
-
-    $.ajax({
-        type: "POST",
-        url: "{{ url('unitbyid')}}",
-        data: {id:id},
-        dataType: "JSON",
-        success: function(data) {
-            $("#editid").val(id);
-            $("#editunit").val(data.message.unit);
-            $("#editdescription").val(data.message.description ?? data.message.Description ?? ''); 
-        }
-    });
 });
 
 //show delete data
