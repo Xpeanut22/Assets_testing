@@ -116,6 +116,7 @@
                             <table id="data" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                 <thead>
                                     <tr>
+<<<<<<< HEAD
                                         <th>ID</th>
                                         <th><?php echo trans('lang.picture'); ?></th>
                                         <th><?php echo trans('lang.name'); ?></th>
@@ -133,10 +134,18 @@
                                         <th>Time and Date</th>
                                         <th>Logistic Custodian</th>
                                         <th><?php echo trans('lang.action'); ?></th>
+=======
+                                        <th>Picture</th>
+                                        <th>Name</th>
+                                        <th>Total</th>
+                                        <th>All Tags</th>
+                                        <th>Action</th>
+>>>>>>> 40839273ae3f56022f397e4899d9687355272872
                                     </tr>
                                 </thead>
                                 <tfoot>
                                     <tr>
+<<<<<<< HEAD
                                         <th>ID</th>
                                         <th><?php echo trans('lang.picture'); ?></th>
                                         <th><?php echo trans('lang.name'); ?></th>
@@ -158,6 +167,15 @@
                                 </tfoot>
                                 <tbody>
                                 </tbody>
+=======
+                                        <th>Picture</th>
+                                        <th>Name</th>
+                                        <th>Total</th>
+                                        <th>All Tags</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </tfoot>
+>>>>>>> 40839273ae3f56022f397e4899d9687355272872
                             </table>
                         </div>
                     </div>
@@ -1164,7 +1182,12 @@
                     data: 'pictures'
                 },
                 {
+<<<<<<< HEAD
                     data: 'name'
+=======
+                    data: 'all_serials',
+                    visible: false
+>>>>>>> 40839273ae3f56022f397e4899d9687355272872
                 },
                 {
                     data: 'serial',
@@ -1278,6 +1301,56 @@
             ]
         });
 
+<<<<<<< HEAD
+=======
+        $('#data tbody').on('click', '.btn-show-component', function() {
+            var tr = $(this).closest('tr');
+            var row = table.row(tr);
+            var name = $(this).data('name');
+
+            if (row.child.isShown()) {
+                row.child.hide();
+                tr.removeClass('shown');
+            } else {
+                $.get("{{ url('getComponentsByName') }}/" + encodeURIComponent(name), function(data) {
+                    var html = '<table class="table table-bordered" style="width:100%">';
+                    html += '<thead><tr>';
+                    html += '<th>Serial</th>';
+                    html += '<th>Supplier</th>';
+                    html += '<th>Brand</th>';
+                    html += '<th>Location</th>';
+                    html += '<th>Type</th>';
+                    html += '<th>Quantity</th>';
+                    html += '<th>Available Quantity</th>';
+                    html += '<th>Control No.</th>';
+                    html += '<th>Issue Type</th>';
+                    html += '<th>Action</th>';
+                    html += '</tr></thead><tbody>';
+
+                    data.forEach(function(item) {
+                        html += '<tr>';
+                        html += '<td>' + (item.serial ?? '-') + '</td>';
+                        html += '<td>' + (item.supplier ?? '-') + '</td>';
+                        html += '<td>' + (item.brand ?? '-') + '</td>';
+                        html += '<td>' + (item.location ?? '-') + '</td>';
+                        html += '<td>' + (item.type ?? '-') + '</td>';
+                        html += '<td>' + (item.quantity ?? '-') + '</td>';
+                        html += '<td>' + zeroquantity(item.caquantity, item.checkstatus) + '</td>';
+                        html += '<td>' + (item.control_number ?? '-') + '</td>';
+                        html += '<td>' + issuetype(item.issuancetype ?? '-') + '</td>';
+                        html += '<td>' + item.action + '</td>';
+                        html += '</tr>';
+                    });
+
+                    html += '</tbody></table>';
+
+                    row.child(html).show();
+                    tr.addClass('shown');
+                });
+            }
+        });
+
+>>>>>>> 40839273ae3f56022f397e4899d9687355272872
 
         //get all supplier
 
