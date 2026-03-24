@@ -116,58 +116,15 @@
                             <table id="data" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                 <thead>
                                     <tr>
-<<<<<<< HEAD
-                                        <th>ID</th>
-                                        <th><?php echo trans('lang.picture'); ?></th>
-                                        <th><?php echo trans('lang.name'); ?></th>
-                                        <th><?php echo trans('lang.serial'); ?></th>
-                                        <th><?php echo trans('lang.purchasedate'); ?></th>
-                                        <th><?php echo trans('lang.cost'); ?></th>
-                                        <th><?php echo trans('lang.description'); ?></th>
-                                        <th><?php echo trans('lang.location'); ?></th>
-                                        <th><?php echo trans('lang.type'); ?></th>
-                                        <th><?php echo trans('lang.brand'); ?></th>
-                                        <th><?php echo trans('lang.quantity'); ?></th>
-                                        <th><?php echo trans('lang.avalaiblequantity'); ?></th>
-                                        <th><?php echo trans('lang.controlno'); ?></th>
-                                        <th><?php echo trans('lang.issuancetype'); ?></th>
-                                        <th>Time and Date</th>
-                                        <th>Logistic Custodian</th>
-                                        <th><?php echo trans('lang.action'); ?></th>
-=======
                                         <th>Picture</th>
                                         <th>Name</th>
                                         <th>Total</th>
                                         <th>All Tags</th>
                                         <th>Action</th>
->>>>>>> 40839273ae3f56022f397e4899d9687355272872
                                     </tr>
                                 </thead>
                                 <tfoot>
                                     <tr>
-<<<<<<< HEAD
-                                        <th>ID</th>
-                                        <th><?php echo trans('lang.picture'); ?></th>
-                                        <th><?php echo trans('lang.name'); ?></th>
-                                        <th><?php echo trans('lang.serial'); ?></th>
-                                        <th><?php echo trans('lang.purchasedate'); ?></th>
-                                        <th><?php echo trans('lang.cost'); ?></th>
-                                        <th><?php echo trans('lang.description'); ?></th>
-                                        <th><?php echo trans('lang.location'); ?></th>
-                                        <th><?php echo trans('lang.type'); ?></th>
-                                        <th><?php echo trans('lang.brand'); ?></th>
-                                        <th><?php echo trans('lang.quantity'); ?></th>
-                                        <th><?php echo trans('lang.avalaiblequantity'); ?></th>
-                                        <th><?php echo trans('lang.controlno'); ?></th>
-                                        <th><?php echo trans('lang.issuancetype'); ?></th>
-                                        <th>Time and Date</th>
-                                        <th>Logistic Custodian</th>
-                                        <th><?php echo trans('lang.action'); ?></th>
-                                    </tr>
-                                </tfoot>
-                                <tbody>
-                                </tbody>
-=======
                                         <th>Picture</th>
                                         <th>Name</th>
                                         <th>Total</th>
@@ -175,7 +132,6 @@
                                         <th>Action</th>
                                     </tr>
                                 </tfoot>
->>>>>>> 40839273ae3f56022f397e4899d9687355272872
                             </table>
                         </div>
                     </div>
@@ -1170,84 +1126,27 @@
 
         "use strict";
 
-        $('#data').DataTable({
-            ajax: "{{ url('component')}}",
+        var table = $('#data').DataTable({
+            ajax: {
+                url: "{{ url('getGroupedComponents') }}"
+            },
             columns: [{
-                    data: 'id',
+                    data: 'pictures',
+                    title: 'Picture',
                     orderable: false,
-                    searchable: false,
-                    visible: false
+                    searchable: false
                 },
                 {
-                    data: 'pictures'
+                    data: 'name',
+                    title: 'Component Name'
                 },
                 {
-<<<<<<< HEAD
-                    data: 'name'
-=======
                     data: 'all_serials',
                     visible: false
->>>>>>> 40839273ae3f56022f397e4899d9687355272872
                 },
                 {
-                    data: 'serial',
-                    orderable: false,
-                    searchable: true,
-                    visible: true
-                },
-                {
-                    data: 'purchasedate',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'cost',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'description',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'location',
-                    orderable: false,
-                    searchable: false,
-                    visible: false
-                },
-                {
-                    data: 'type'
-                },
-                {
-                    data: 'brand'
-                },
-                {
-                    data: 'caquantity'
-                },
-                {
-                    data: function(e) {
-                        return zeroquantity(e.avalaiblequantity);
-                    },
-                },
-                {
-                    data: function(e) {
-                        return controlnumber(e.control_number);
-                    },
-                },
-                {
-                    data: function(e) {
-                        return issuetype(e.issuancetype);
-                    },
-                },
-                {
-                    data: 'created_at'
-                },
-                {
-                    data: 'cacreated'
+                    data: 'total',
+                    title: 'Total Items'
                 },
                 {
                     data: 'action',
@@ -1255,54 +1154,9 @@
                     searchable: false
                 }
             ],
-            dom: "<'row'<'col-sm-9 text-left'B><'col-sm-3'f>>" +
-                "<'row'<'col-sm-12'tr>>" +
-                "<'row'<'col-sm-2'l><'col-sm-5'i><'col-sm-5'p>>",
-            buttons: [{
-                    extend: 'copy',
-                    text: 'Copy <i class=\"fa fa-files-o\"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.component_list'); ?>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    }
-                },
-                {
-                    extend: 'csv',
-                    text: 'CSV <i class=\"fa fa-file-excel-o\"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.component_list'); ?>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    }
-                },
-                {
-                    extend: 'pdf',
-                    text: 'PDF <i class=\"fa fa-file-pdf-o\"></i>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.component_list'); ?>',
-                    orientation: 'landscape',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    },
-                    customize: function(doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-                    }
-                },
-                {
-                    extend: 'print',
-                    title: '<?php echo trans('lang.component_list'); ?>',
-                    className: 'btn btn-sm btn-fill btn-info ',
-                    text: 'Print <i class=\"fa fa-print\"></i>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-                    }
-                }
-            ]
+            buttons: []
         });
 
-<<<<<<< HEAD
-=======
         $('#data tbody').on('click', '.btn-show-component', function() {
             var tr = $(this).closest('tr');
             var row = table.row(tr);
@@ -1349,8 +1203,6 @@
                 });
             }
         });
-
->>>>>>> 40839273ae3f56022f397e4899d9687355272872
 
         //get all supplier
 
