@@ -48,6 +48,11 @@
                                             aria-selected="true"><?php echo trans('lang.details'); ?></a>
                                     </li>
                                     <li class="nav-item">
+                                        <a class="nav-link" id="history-tab" data-toggle="tab" href="#history"
+                                            role="tab" aria-controls="history"
+                                            aria-selected="false"><?php echo trans('lang.history'); ?></a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a class="nav-link" id="file-tab" data-toggle="tab" href="#file"
                                             role="tab" aria-controls="file"
                                             aria-selected="false"><?php echo trans('lang.file'); ?></a>
@@ -61,13 +66,129 @@
                                 <div class="tab-content" id="myTabContent">
                                     <div class="tab-pane fade show active" id="details" role="tabpanel"
                                         aria-labelledby="details-tab">
+                                        <div class="row">
+                                            <div class="col-md-9 pt-3">
+                                                <table class="table table-hover" cellpadding="0" cellspacing="0">
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.type'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componenttype"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.status'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 assetstatus"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.serial'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentserial"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.brand'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentbrand"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.quantity'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentquantity"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.purchasedate'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentpurchasedate"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.cost'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentcost"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.warranty'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentwarranty"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.location'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentlocation"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.supplier'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentsupplier"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.updatedat'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentupdated"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.createdat'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentcreated"></p>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td bgcolor="#f2f3f4" width="200">
+                                                            <p class="mb-0 font-bold"><?php echo trans('lang.description'); ?>:</p>
+                                                        </td>
+                                                        <td>
+                                                            <p class="mb-0 componentdescription"></p>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </div>
+                                            <div class="col-md-3 pt-2 text-center">
+                                                <img width="250" class="img-responsive componentimage" src="" onerror="this.onerror=null;this.src='{{ url('/upload/assets/pic.png') }}';" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="history" role="tabpanel"
+                                        aria-labelledby="history-tab">
                                         <div class="table-responsive  pt-4">
-                                            <table id="datacomponent" class="table table-striped table-bordered" cellspacing="0" width="100%">
+                                            <table id="datahistory" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                                 <thead>
                                                     <tr>
                                                         <th>ID</th>
                                                         <th><?php echo trans('lang.controlno'); ?></th>
-                                                        <!-- <th><?php echo trans('lang.name'); ?></th> -->
+                                                        <th><?php echo trans('lang.description'); ?></th>
                                                         <th><?php echo trans('lang.quantity'); ?></th>
                                                         <th><?php echo trans('lang.date'); ?></th>
                                                         <th><?php echo trans('lang.remarks'); ?></th>
@@ -82,7 +203,7 @@
                                                     <tr>
                                                         <th>ID</th>
                                                         <th><?php echo trans('lang.controlno'); ?></th>
-                                                        <!-- <th><?php echo trans('lang.name'); ?></th> -->
+                                                        <th><?php echo trans('lang.description'); ?></th>
                                                         <th><?php echo trans('lang.quantity'); ?></th>
                                                         <th><?php echo trans('lang.date'); ?></th>
                                                         <th><?php echo trans('lang.remarks'); ?></th>
@@ -305,18 +426,29 @@
             success: function(data) {
                 $(".componentname").html(data.message.componentname);
                 $(".serial").html(data.message.serial);
-                $(".serial").html(data.message.serial);
                 $(".type").html(data.message.type);
                 $(".assetstatus").html(data.assetstatus);
-
+                $(".componenttype").html(data.message.type);
+                $(".componentserial").html(data.message.serial);
+                $(".componentbrand").html(data.message.brand);
+                $(".componentquantity").html(data.message.quantity);
+                $(".componentpurchasedate").html(data.assetpurchasedate);
+                $(".componentcost").html(data.assetcost);
+                $(".componentwarranty").html(data.message.warranty);
+                $(".componentlocation").html(data.message.location);
+                $(".componentsupplier").html(data.message.supplier);
+                $(".componentupdated").html(data.assetupdated_at);
+                $(".componentcreated").html(data.assetcreated_at);
+                $(".componentdescription").html(data.message.componentdescription);
                 $(".assetbarcode").html(data.assetbarcode);
+                $(".componentimage").attr("src", data.assetimage);
             }
         });
 
 
 
-        //component data
-        $('#datacomponent').DataTable({
+        //history data
+        $('#datahistory').DataTable({
 
             ajax: {
                 url: "{{ url('historycomponentbyid')}}",
@@ -334,6 +466,9 @@
                 },
                 {
                     data: 'control_number'
+                },
+                {
+                    data: 'description'
                 },
                 // {
                 //     data: 'name'
@@ -373,7 +508,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     title: '<?php echo trans('lang.componentdetail '); ?>',
                     exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                        columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
                     }
                 },
                 {
@@ -382,7 +517,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     title: '<?php echo trans('lang.componentdetail'); ?>',
                     exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                        columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
                     }
                 },
@@ -393,7 +528,7 @@
                     title: '<?php echo trans('lang.componentdetail'); ?>',
                     orientation: 'landscape',
                     exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                        columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
                     },
                     customize: function(doc) {
@@ -408,7 +543,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
                     exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                        columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
                     }
                 }

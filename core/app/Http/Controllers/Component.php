@@ -123,7 +123,11 @@ class Component extends Controller
                 return $remain;
             })
             ->addColumn('pictures', function ($single) {
-                return '<img src="' . url('/') . '/upload/assets/' . $single->picture . '" style="width:90px"/>';
+                $image = $single->picture ?: 'pic.png';
+                $imageUrl = url('/upload/assets/' . $image);
+                $fallbackUrl = url('/upload/assets/pic.png');
+
+                return '<img src="' . $imageUrl . '" style="width:90px" onerror="this.onerror=null;this.src=\'' . $fallbackUrl . '\';"/>';
             })
             ->addColumn('action', function ($accountsingle) {
                 //for checkout 2 button, checkin or checkout depand the record
@@ -190,9 +194,10 @@ class Component extends Controller
             ->addColumn('pictures', function ($row) {
                 $url = $row->picture
                     ? url('/upload/assets/' . $row->picture)
-                    : url('/upload/assets/default.png');
+                    : url('/upload/assets/pic.png');
+                $fallbackUrl = url('/upload/assets/pic.png');
 
-                return '<img src="' . $url . '" style="width:90px"/>';
+                return '<img src="' . $url . '" style="width:90px" onerror="this.onerror=null;this.src=\'' . $fallbackUrl . '\';"/>';
             })
             ->addColumn('action', function ($row) {
                 return '<button class="btn btn-sm btn-info btn-show-component" data-name="'
@@ -358,7 +363,8 @@ class Component extends Controller
             $res['assetbarcode'] = '<img src="data:image/png;base64,' . DNS2D::getBarcodePNG($data->serial, 'QRCODE') . '" alt="barcode" width="70"  />';
 
 
-            $res['assetimage']  = url('/') . '/upload/assets/' . $data->picture;
+            $assetImage = $data->picture ?: 'pic.png';
+            $res['assetimage']  = url('/upload/assets/' . $assetImage);
         } else {
             $res['success'] = 'failed';
         }
@@ -1323,7 +1329,11 @@ class Component extends Controller
                 return $remain;
             })
             ->addColumn('pictures', function ($single) {
-                return '<img src="' . url('/') . '/upload/assets/' . $single->picture . '" style="width:90px"/>';
+                $image = $single->picture ?: 'pic.png';
+                $imageUrl = url('/upload/assets/' . $image);
+                $fallbackUrl = url('/upload/assets/pic.png');
+
+                return '<img src="' . $imageUrl . '" style="width:90px" onerror="this.onerror=null;this.src=\'' . $fallbackUrl . '\';"/>';
             })
             ->rawColumns(['avalaiblequantity', 'pictures'])
             ->make(true);
@@ -1340,7 +1350,7 @@ class Component extends Controller
     {
         $id            = $request->input('id');
 
-        $data = DB::select("select component_assets.*, assets.name as assetname, component.name, component.serial, component.checkstatus, employees.fullname as efullname, receiver.fullname as rfullname, employees.mobile_number, department.name
+        $data = DB::select("select component_assets.*, assets.name as assetname, component.name, component.serial, component.description, component.checkstatus, employees.fullname as efullname, receiver.fullname as rfullname, employees.mobile_number, department.name
         from component_assets left join assets  
         on component_assets.assetid = assets.id left join component
         on component_assets.componentid = component.id left join employees
