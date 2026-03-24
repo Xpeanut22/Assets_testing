@@ -213,7 +213,7 @@ return [
     'checkin' =>'Returned',
     'checkout' =>'Borrowed',
     'issue' => 'Issuance',
-    'issuelist' => 'Issuance List',
+    'issuelist' => 'Consumable List',
     'issueto' => 'Issued to',
     'remarks' => 'Remarks',
     'remarkshere' => 'Please insert your remarks here . . .',
