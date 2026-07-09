@@ -59,7 +59,9 @@
         function assetstatus(itemstatus, historyStatus) {
             if (historyStatus == 4) {
                 return "<span class='badge badge-data text-white background-red'>Unserviceable</span>";
-            } else if (historyStatus == 1 || historyStatus == 2 || historyStatus == 3) {
+            } else if (historyStatus == 1) {
+                return "<span class='badge badge-data text-white background-green'>Serviceable</span>";
+            } else if (historyStatus == 2 || historyStatus == 3) {
                 return "<span class='badge badge-data text-white background-green'>Ready to Deploy</span>";
             } else if (itemstatus == 1) {
                 return "<span class='badge badge-data text-white background-green'>Ready to Deploy</span>";
