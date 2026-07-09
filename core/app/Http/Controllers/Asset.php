@@ -249,11 +249,18 @@ class Asset extends Controller
         return Datatables::of($data)
 
             ->addColumn('status', function ($single) {
+                $status = trans('lang.undefined');
                 if ($single->status == '1') {
                     $status = trans('lang.checkout');
                 }
                 if ($single->status == '2') {
                     $status = trans('lang.checkin');
+                }
+                if ($single->status == '3') {
+                    $status = trans('lang.serviceable');
+                }
+                if ($single->status == '4') {
+                    $status = trans('lang.unserviceable');
                 }
                 return $status;
             })

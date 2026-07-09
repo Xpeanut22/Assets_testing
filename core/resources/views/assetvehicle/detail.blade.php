@@ -673,7 +673,7 @@
     //history data
     $('#datahistory').DataTable({
         ajax: {
-        url: "{{ url('historyassetbyid')}}",
+        url: "{{ url('historyassetbyidvehicle')}}",
         type: "post",
         data: function (d) {
               d.assetid = id;
