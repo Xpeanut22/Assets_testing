@@ -27,6 +27,74 @@ class AssetVehicle extends Controller
         $this->middleware('auth');
     }
 
+    private function syncUnserviceableMaintenance($assetid, $createdBy, $date, $updated_at, $remarks = null)
+    {
+        $hasMaintenanceDeleteColumn = DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete');
+        $maintenanceQuery = DB::table('maintenance')
+            ->where('assetid', $assetid)
+            ->where('type', '!=', 'Operational')
+            ->whereNull('enddate');
+
+        if ($hasMaintenanceDeleteColumn) {
+            $maintenanceQuery->where('is_delete', 0);
+        }
+
+        $maintenance = $maintenanceQuery->orderBy('id', 'desc')->first();
+        $remarks = trim((string) $remarks);
+        $hasCustomRemarks = $remarks !== '';
+        $remarks = $hasCustomRemarks ? $remarks : 'Marked as unserviceable from Asset Vehicle. Edit the problem details here.';
+        $maintenanceData = [
+            'assetid' => $assetid,
+            'type' => 'Unserviceable',
+            'reason_remarks' => $remarks,
+            'startdate' => $date ?: $updated_at,
+            'enddate' => null,
+            'created_by' => $createdBy,
+            'updated_at' => $updated_at
+        ];
+
+        if ($maintenance) {
+            if (!$hasCustomRemarks && !empty($maintenance->reason_remarks) && $maintenance->reason_remarks !== $maintenanceData['reason_remarks']) {
+                unset($maintenanceData['reason_remarks']);
+            }
+
+            DB::table('maintenance')->where('id', $maintenance->id)->update($maintenanceData);
+            return;
+        }
+
+        $maintenanceData['created_at'] = $updated_at;
+        if ($hasMaintenanceDeleteColumn) {
+            $maintenanceData['is_delete'] = 0;
+        }
+
+        DB::table('maintenance')->insert($maintenanceData);
+    }
+
+    private function closeUnserviceableMaintenance($assetid, $date, $updated_at)
+    {
+        $hasMaintenanceDeleteColumn = DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete');
+        $maintenanceQuery = DB::table('maintenance')
+            ->where('assetid', $assetid)
+            ->where('type', '!=', 'Operational');
+
+        if ($hasMaintenanceDeleteColumn) {
+            $maintenanceQuery->where('is_delete', 0);
+        }
+
+        $maintenance = (clone $maintenanceQuery)->whereNull('enddate')->orderBy('id', 'desc')->first();
+
+        if (!$maintenance) {
+            $maintenance = $maintenanceQuery->orderBy('id', 'desc')->first();
+        }
+
+        if ($maintenance) {
+            DB::table('maintenance')->where('id', $maintenance->id)->update([
+                'enddate' => $date ?: $updated_at,
+                'updated_at' => $updated_at
+            ]);
+        }
+    }
+
     //return page
     public function index()
     {
@@ -60,7 +128,7 @@ class AssetVehicle extends Controller
      */
     public function getdata()
     {
-        $data = DB::select("select assets.*, supplier.name as supplier, brand.name as brand, asset_type.name as type , location.name as location
+        $data = DB::select("select assets.*, supplier.name as supplier, brand.name as brand, asset_type.name as type , location.name as location, ah.status as historystatus
         from assets left join supplier 
         on assets.supplierid = supplier.id
         left join brand 
@@ -69,8 +137,16 @@ class AssetVehicle extends Controller
         on assets.typeid = asset_type.id
         left join location
         on assets.locationid = location.id
+        left join (
+            select h1.*
+            from asset_history h1
+            inner join (
+                select assetid, max(id) as max_id
+                from asset_history
+                group by assetid
+            ) h2 on h1.assetid = h2.assetid and h1.id = h2.max_id
+        ) ah on ah.assetid = assets.id
         where assets.typeid = 7
-        and assets.is_delete = 0
         order by assets.created_at desc");
         return Datatables::of($data)
             ->addColumn('pictures', function ($single) {
@@ -133,6 +209,12 @@ class AssetVehicle extends Controller
                 if ($single->status == '2') {
                     $status = trans('lang.checkin');
                 }
+                if ($single->status == '3') {
+                    $status = trans('lang.serviceable');
+                }
+                if ($single->status == '4') {
+                    $status = trans('lang.unserviceable');
+                }
                 return $status;
             })
 
@@ -166,7 +248,9 @@ class AssetVehicle extends Controller
         if ($data) {
 
             //set status
-            if ($data->status == '1') {
+            if ($data->checkstatus == '2') {
+                $status = trans('lang.checkout');
+            } elseif ($data->status == '1') {
                 $status = trans('lang.readytodeploy');
             }
             if ($data->status == '2') {
@@ -182,7 +266,7 @@ class AssetVehicle extends Controller
                 $status = trans('lang.lost');
             }
             if ($data->status == '6') {
-                $status = trans('lang.outofrepair');
+                $status = trans('lang.unserviceable');
             }
 
             //get date format setting
@@ -209,7 +293,6 @@ class AssetVehicle extends Controller
         }
         return response($res);
     }
-
 
     /**
      * get single data where is not id
@@ -513,8 +596,17 @@ class AssetVehicle extends Controller
         $assetid        = $request->input('assetid');
         $employeeid     = $request->input('employeeid');
         $date           = $request->input('checkoutdate');
-        $status         = '1'; //checkout = 1
-        $checkstatus    = '2';
+        $vehiclestatus  = $request->input('vehiclestatus');
+        $remarks        = $request->input('remarks');
+        $status         = '1';
+        if ($vehiclestatus === 'returned') {
+            $status = '2';
+        } elseif ($vehiclestatus === 'serviceable') {
+            $status = '3';
+        } elseif ($vehiclestatus === 'unserviceable') {
+            $status = '4';
+        }
+        $checkstatus    = ($vehiclestatus === 'borrowed') ? '2' : '0';
         $receiverby     = Auth::id();
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
@@ -522,15 +614,21 @@ class AssetVehicle extends Controller
         $insert         = DB::table('asset_history')->insert($data);
 
         if ($insert) {
+            $assetUpdate = [
+                'checkstatus'         => $checkstatus,
+                'status'              => ($vehiclestatus === 'unserviceable') ? '6' : '1',
+                'updated_at'          => $updated_at
+            ];
 
             //set status in table asset
             $update = DB::table('assets')->where('id', $assetid)
-                ->update(
-                    [
-                        'checkstatus'         => $checkstatus,
-                        'updated_at'          => $updated_at
-                    ]
-                );
+                ->update($assetUpdate);
+
+            if ($vehiclestatus === 'unserviceable') {
+                $this->syncUnserviceableMaintenance($assetid, $employeeid, $date, $updated_at, $remarks);
+            } elseif ($vehiclestatus === 'serviceable') {
+                $this->closeUnserviceableMaintenance($assetid, $date, $updated_at);
+            }
 
             $res['success'] = 'success';
         } else {
@@ -554,8 +652,17 @@ class AssetVehicle extends Controller
         $assetid        = $request->input('assetid');
         $employeeid     = $request->input('employeeid1');
         $date           = $request->input('checkindate');
-        $status         = '2'; //checkout = 1
-        $checkstatus    = '0';
+        $vehiclestatus  = $request->input('vehiclestatus');
+        $remarks        = $request->input('remarks');
+        $status         = '2';
+        if ($vehiclestatus === 'borrowed') {
+            $status = '1';
+        } elseif ($vehiclestatus === 'serviceable') {
+            $status = '3';
+        } elseif ($vehiclestatus === 'unserviceable') {
+            $status = '4';
+        }
+        $checkstatus    = ($vehiclestatus === 'borrowed') ? '2' : '0';
         $receiverby     = Auth::id();
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
@@ -563,14 +670,21 @@ class AssetVehicle extends Controller
         $insert         = DB::table('asset_history')->insert($data);
 
         if ($insert) {
+            $assetUpdate = [
+                'checkstatus'         => $checkstatus,
+                'status'              => ($vehiclestatus === 'unserviceable') ? '6' : '1',
+                'updated_at'          => $updated_at
+            ];
+
             //set status in table asset
             $update = DB::table('assets')->where('id', $assetid)
-                ->update(
-                    [
-                        'checkstatus'         => $checkstatus,
-                        'updated_at'          => $updated_at
-                    ]
-                );
+                ->update($assetUpdate);
+
+            if ($vehiclestatus === 'unserviceable') {
+                $this->syncUnserviceableMaintenance($assetid, $employeeid, $date, $updated_at, $remarks);
+            } elseif ($vehiclestatus === 'serviceable') {
+                $this->closeUnserviceableMaintenance($assetid, $date, $updated_at);
+            }
             $res['success'] = 'success';
         } else {
             $res['success'] = 'failed';

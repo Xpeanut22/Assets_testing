@@ -36,6 +36,12 @@ class Home extends Controller
 	 * @return object
 	 */
 	public function totalbalance() {
+		$employeeQuery = DB::table('employees')
+		->select(DB::raw('count(*) as totalemployee'));
+
+		if (DB::getSchemaBuilder()->hasColumn('employees', 'is_delete')) {
+			$employeeQuery->where('is_delete', 0);
+		}
 
 		$totalasset   = DB::table('assets')
 		->select(DB::raw('count(*) as totalasset'))
@@ -49,10 +55,7 @@ class Home extends Controller
 		->select(DB::raw('count(*) as totalmaintenance'))
 		->first();
 
-		$totalemployee   = DB::table('employees')
-		->where('is_delete', 0)
-		->select(DB::raw('count(*) as totalemployee'))
-		->first();
+		$totalemployee = $employeeQuery->first();
 
 		$data['totalasset'] 		= $totalasset->totalasset;
 		$data['totalcomponent'] 	= $totalcomponent->totalcomponent;

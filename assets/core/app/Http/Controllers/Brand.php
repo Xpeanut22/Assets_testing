@@ -33,7 +33,10 @@ class Brand extends Controller
 	 * @return object
 	 */
     public function getdata(){
-        $data = DB::table('brand')->select(['brand.*'])->where('is_delete', 0);
+        $data = DB::table('brand')->select(['brand.*']);
+        if (DB::getSchemaBuilder()->hasColumn('brand', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
 		return Datatables::of($data)
 		->addColumn( 'action', function ( $accountsingle ) {
             return '<a href="#" id="btnedit" customdata='.$accountsingle->id.' class="btn btn-sm btn-primary" data-toggle="modal" data-target="#edit"><i class="fa fa-pencil"></i> '. trans('lang.edit').'</a>
@@ -55,10 +58,11 @@ class Brand extends Controller
     // }
 
     public function getrows() {
-        $data = DB::table('brand')
-                  ->where('is_delete', 0)
-                  ->where('type', 'tools') 
-                  ->get();
+        $query = DB::table('brand')->where('type', 'tools');
+        if (DB::getSchemaBuilder()->hasColumn('brand', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
     
         $res = ['success' => false, 'message' => 'No data found'];
     
@@ -71,10 +75,11 @@ class Brand extends Controller
     }
 
     public function listofvehiclebrand() {
-        $data = DB::table('brand')
-                  ->where('is_delete', 0)
-                  ->where('type', 'vehicle') 
-                  ->get();
+        $query = DB::table('brand')->where('type', 'vehicle');
+        if (DB::getSchemaBuilder()->hasColumn('brand', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
     
         $res = ['success' => false, 'message' => 'No data found'];
     

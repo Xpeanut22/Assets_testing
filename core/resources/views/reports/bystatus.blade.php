@@ -24,7 +24,7 @@
                                             <option value="3"><?php echo trans('lang.archived');?></option>
                                             <option value="4"><?php echo trans('lang.broken');?></option>
                                             <option value="5"><?php echo trans('lang.lost');?></option>
-                                            <option value="6"><?php echo trans('lang.outofrepair');?></option>
+                                            <option value="6"><?php echo trans('lang.unserviceable');?></option>
                                         </select>
                                     </div>
                                     <div class="form-group col-md-2" style="padding-top:33px;">

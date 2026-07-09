@@ -328,7 +328,7 @@
                                     <option value="3"><?php echo trans('lang.archived'); ?></option>
                                     <option value="4"><?php echo trans('lang.broken'); ?></option>
                                     <option value="5"><?php echo trans('lang.lost'); ?></option>
-                                    <option value="6"><?php echo trans('lang.outofrepair'); ?></option>
+                                    <option value="6"><?php echo trans('lang.unserviceable'); ?></option>
                                 </select>
                             </div>
                         </div>
@@ -526,7 +526,7 @@
                                     <option value="3"><?php echo trans('lang.archived'); ?></option>
                                     <option value="4"><?php echo trans('lang.broken'); ?></option>
                                     <option value="5"><?php echo trans('lang.lost'); ?></option>
-                                    <option value="6"><?php echo trans('lang.outofrepair'); ?></option>
+                                    <option value="6"><?php echo trans('lang.unserviceable'); ?></option>
                                 </select>
                             </div>
                         </div>
@@ -553,8 +553,6 @@
         </div>
     </div>
     <!--end edit data-->
-
-
 
     <!--add checkout -->
     <div id="checkout" class="modal fade" role="dialog">
@@ -583,10 +581,29 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group col-md-12">
-                                <label id="borrowername">Borrower's Name</label>
+                                <label id="borrowername">Name</label>
                                 <select name="employeeid" id="checkoutemployeeid" required class="select2 selectCreate">
                                     <option value=""><?php echo trans('lang.employee'); ?></option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-12">
+                                <label><?php echo trans('lang.hstatus'); ?></label>
+                                <select name="vehiclestatus" id="checkoutvehiclestatus" required class="form-control">
+                                    <option value="borrowed" selected><?php echo trans('lang.checkout'); ?></option>
+                                    <option value="returned"><?php echo trans('lang.checkin'); ?></option>
+                                    <option value="serviceable"><?php echo trans('lang.serviceable'); ?></option>
+                                    <option value="unserviceable"><?php echo trans('lang.unserviceable'); ?></option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row display-none" id="checkoutremarksrow">
+                            <div class="form-group col-md-12">
+                                <label>Remarks</label>
+                                <textarea name="remarks" id="checkoutremarks" class="form-control" rows="4" placeholder="Type why this vehicle is unserviceable"></textarea>
                             </div>
                         </div>
 
@@ -637,10 +654,29 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group col-md-12">
-                                <label id="returnname">Returner's Name</label>
+                                <label id="returnname">Name</label>
                                 <select name="employeeid1" id="checkoutemployeeid1" required class="select2 selectCreate">
                                     <option value=""><?php echo trans('lang.employee'); ?></option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-12">
+                                <label><?php echo trans('lang.hstatus'); ?></label>
+                                <select name="vehiclestatus" id="checkinvehiclestatus" required class="form-control">
+                                    <option value="borrowed"><?php echo trans('lang.checkout'); ?></option>
+                                    <option value="returned" selected><?php echo trans('lang.checkin'); ?></option>
+                                    <option value="serviceable"><?php echo trans('lang.serviceable'); ?></option>
+                                    <option value="unserviceable"><?php echo trans('lang.unserviceable'); ?></option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row display-none" id="checkinremarksrow">
+                            <div class="form-group col-md-12">
+                                <label>Remarks</label>
+                                <textarea name="remarks" id="checkinremarks" class="form-control" rows="4" placeholder="Type why this vehicle is unserviceable"></textarea>
                             </div>
                         </div>
 
@@ -766,6 +802,23 @@
             $('#checkindate').val(formattedDateTime);
             $('#checkoutdate').val(formattedDateTime);
 
+            function toggleVehicleRemarks(selectId, rowId, textareaId) {
+                var showRemarks = $('#' + selectId).val() === 'unserviceable';
+                $('#' + rowId).toggle(showRemarks);
+                $('#' + textareaId).prop('required', showRemarks);
+                if (!showRemarks) {
+                    $('#' + textareaId).val('');
+                }
+            }
+
+            $('#checkoutvehiclestatus').on('change', function() {
+                toggleVehicleRemarks('checkoutvehiclestatus', 'checkoutremarksrow', 'checkoutremarks');
+            });
+
+            $('#checkinvehiclestatus').on('change', function() {
+                toggleVehicleRemarks('checkinvehiclestatus', 'checkinremarksrow', 'checkinremarks');
+            });
+
 
             $('.select2').on('select2:select', function(e) {
                 var selectedValue = e.params.data.id;
@@ -792,8 +845,10 @@
         });
 
 
-        function assetstatus(status) {
-            if (status == 1) {
+        function assetstatus(status, checkstatus) {
+            if (checkstatus == 2) {
+                return "<span class='badge badge-data text-white background-yellow'>Borrowed</span>";
+            } else if (status == 1) {
                 return "<span class='badge badge-data text-white background-green'>Ready to Deploy</span>";
             } else if (status == 2) {
                 return "<span class='badge badge-data text-white background-yellow'>Pending</span>";
@@ -808,17 +863,21 @@
                 return "<span class='badge badge-data text-white background-black'>Lost</span>";
 
             } else if (status == 6) {
-                return "<span class='badge badge-data text-white background-blue'>Out of Repair</span>";
+                return "<span class='badge badge-data text-white background-red'>Unserviceable</span>";
 
             } else {
                 return "<span class='badge badge-data text-white background-gray'>Undefined</span>";
             }
         }
 
-        function historystatus(checkstatus) {
+        function historystatus(checkstatus, historyStatus) {
             console.log(checkstatus)
-            if (checkstatus == 2) {
-                return "<span class='badge badge-data text-white background-red'>Borrowed</span>";
+            if (historyStatus == 3) {
+                return "<span class='badge badge-data text-white background-green'>Serviceable</span>";
+            } else if (historyStatus == 4) {
+                return "<span class='badge badge-data text-white background-red'>Unserviceable</span>";
+            } else if (checkstatus == 2 || historyStatus == 1) {
+                return "<span class='badge badge-data text-white background-yellow'>Borrowed</span>";
             } else {
                 return "<span class='badge badge-data text-white background-blue'>Returned</span>";
             }
@@ -900,12 +959,12 @@
                     data: 'location'
                 }, {
                     data: function(e) {
-                        return assetstatus(e.status);
+                        return assetstatus(e.status, e.checkstatus);
                     },
                 },
                 {
                     data: function(e) {
-                        return historystatus(e.checkstatus);
+                        return historystatus(e.checkstatus, e.historystatus);
                     },
                 },
                 {
@@ -1634,6 +1693,10 @@
                     $("#assetid").val(id);
                     $("#checkoutname").val(data.message.assetname);
                     $("#checkoutassettag").val(data.message.assettag);
+                    $("#checkoutvehiclestatus").val('borrowed');
+                    $("#checkoutremarks").val('');
+                    $("#checkoutremarksrow").hide();
+                    $("#checkoutremarks").prop('required', false);
                 }
             });
         });
@@ -1657,6 +1720,10 @@
                     $("#checkinassetid").val(id);
                     $("#checkinname").val(data.message.name);
                     $("#checkinassettag").val(data.message.assettag);
+                    $("#checkinvehiclestatus").val('returned');
+                    $("#checkinremarks").val('');
+                    $("#checkinremarksrow").hide();
+                    $("#checkinremarks").prop('required', false);
                 }
             });
         });

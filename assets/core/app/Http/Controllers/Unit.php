@@ -36,9 +36,11 @@ class Unit extends Controller
      */
     public function getdata()
     {
+        $unitDeleteFilter = DB::getSchemaBuilder()->hasColumn('units', 'is_delete') ? 'where is_delete = 0' : '';
+
         $data = DB::select("select *
         from units
-        where is_delete = 0");
+        $unitDeleteFilter");
         return Datatables::of($data)
 
             ->addColumn('action', function ($accountsingle) {
@@ -55,7 +57,11 @@ class Unit extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('units')->where('is_delete', 0)->get();
+        $query = DB::table('units');
+        if (DB::getSchemaBuilder()->hasColumn('units', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;

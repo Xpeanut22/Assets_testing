@@ -107,6 +107,8 @@ class Component extends Controller
      */
     public function getdata()
     {
+        $componentDeleteFilter = DB::getSchemaBuilder()->hasColumn('component', 'is_delete') ? 'where component.is_delete = 0' : '';
+
         $data = DB::select("select component.*, component_assets.created_by cacreated ,component_assets.quantity as caquantity, supplier.name as supplier, location.name as location, brand.name as brand, asset_type.name as type, component_assets.control_number, component_assets.issuancetype
         from component left join supplier 
         on component.supplierid = supplier.id
@@ -117,7 +119,7 @@ class Component extends Controller
         left join asset_type
         on component.typeid = asset_type.id left join component_assets
         on component_assets.componentid = component.id 
-        where component.is_delete = 0
+        $componentDeleteFilter
         order by component.created_at desc");
         return Datatables::of($data)
             ->addColumn('avalaiblequantity', function ($single) {
@@ -164,6 +166,11 @@ class Component extends Controller
 
     public function getGroupedComponents()
     {
+        $hasComponentDeleteColumn = DB::getSchemaBuilder()->hasColumn('component', 'is_delete');
+        $componentDeleteFilter = $hasComponentDeleteColumn ? 'AND is_delete = 0' : '';
+        $componentAliasDeleteFilter = $hasComponentDeleteColumn ? 'AND c.is_delete = 0' : '';
+        $componentControlDeleteFilter = $hasComponentDeleteColumn ? 'AND cc.is_delete = 0' : '';
+
         $data = DB::select("
         SELECT 
             c.name,
@@ -173,24 +180,25 @@ class Component extends Controller
                 FROM component 
                 WHERE name = c.name 
                 AND picture IS NOT NULL 
-                AND is_delete = 0
+                $componentDeleteFilter
                 LIMIT 1
             ) as picture,
             (
                 SELECT GROUP_CONCAT(serial SEPARATOR ',')
                 FROM component
                 WHERE name = c.name
-                AND is_delete = 0
+                $componentDeleteFilter
             ) as all_serials,
             (
                 SELECT GROUP_CONCAT(control_number SEPARATOR ',')
                 FROM component_assets ca
                 LEFT JOIN component cc ON cc.id = ca.componentid
                 WHERE cc.name = c.name
-                AND cc.is_delete = 0
+                $componentControlDeleteFilter
             ) as all_controls
         FROM component c
-        WHERE c.is_delete = 0
+        WHERE 1 = 1
+        $componentAliasDeleteFilter
         GROUP BY c.name
         ORDER BY c.name
     ");
@@ -222,6 +230,8 @@ class Component extends Controller
 
     public function getComponentsByName($name)
     {
+        $componentDeleteFilter = DB::getSchemaBuilder()->hasColumn('component', 'is_delete') ? 'AND component.is_delete = 0' : '';
+
         $data = DB::select("
         SELECT 
             component.*, 
@@ -259,7 +269,7 @@ class Component extends Controller
         LEFT JOIN location ON component.locationid = location.id
         LEFT JOIN asset_type ON component.typeid = asset_type.id
         WHERE component.name = ?
-        AND component.is_delete = 0
+        $componentDeleteFilter
     ", [$name]);
 
         foreach ($data as $row) {
@@ -1325,6 +1335,7 @@ class Component extends Controller
     public function assetsbyid(Request $request)
     {
         $id            = $request->input('assetid');
+        $componentDeleteFilter = DB::getSchemaBuilder()->hasColumn('component', 'is_delete') ? 'and component.is_delete = 0' : '';
 
         $data = DB::select("select component.*, supplier.name as supplier, brand.name as brand, asset_type.name as type 
         from component left join supplier  
@@ -1335,7 +1346,7 @@ class Component extends Controller
         on component.id = component_assets.componentid
         left join asset_type
         on component.typeid = asset_type.id where component_assets.assetid ='$id'
-        and component.is_delete = 0
+        $componentDeleteFilter
         order by component.created_at desc");
         return Datatables::of($data)
             ->addColumn('avalaiblequantity', function ($single) {

@@ -39,10 +39,12 @@ class Employees extends Controller
      */
     public function getdata()
     {
+        $employeeDeleteFilter = DB::getSchemaBuilder()->hasColumn('employees', 'is_delete') ? 'where employees.is_delete = 0' : '';
+
         $data = DB::select("select employees.*, department.name as department 
         from employees left join department 
         on employees.departmentid = department.id
-        where employees.is_delete = 0
+        $employeeDeleteFilter
         order by employees.created_at desc");
         return Datatables::of($data)
 
@@ -60,7 +62,11 @@ class Employees extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('employees')->where('is_delete', 0)->get();
+        $query = DB::table('employees');
+        if (DB::getSchemaBuilder()->hasColumn('employees', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;

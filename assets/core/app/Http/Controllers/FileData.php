@@ -34,12 +34,13 @@ class FileData extends Controller
      */
     public function getdataaset(Request $request){
         $id            = $request->input( 'assetid' );
+        $fileDeleteFilter = DB::getSchemaBuilder()->hasColumn('file', 'is_delete') ? 'and file.is_delete = 0' : '';
 
         $data = DB::select("select file.* 
         from file left join assets 
         on file.assetid = assets.id
         where file.assetid = '$id'
-        and file.is_delete = 0
+        $fileDeleteFilter
         order by file.created_at desc"); 
         return Datatables::of($data)
         ->addColumn('filename',function($single){
@@ -58,12 +59,13 @@ class FileData extends Controller
      */
     public function getdatacomponent(Request $request){
         $id            = $request->input( 'componentid' );
+        $fileDeleteFilter = DB::getSchemaBuilder()->hasColumn('file', 'is_delete') ? 'and file.is_delete = 0' : '';
 
         $data = DB::select("select file.* 
         from file left join component 
         on file.componentid = component.id
         where file.componentid = '$id'
-        and file.is_delete = 0
+        $fileDeleteFilter
         order by file.created_at desc"); 
         return Datatables::of($data)
         ->addColumn('filename',function($single){

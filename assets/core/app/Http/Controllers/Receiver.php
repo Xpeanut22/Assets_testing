@@ -33,9 +33,11 @@ class Receiver extends Controller
 	 * @return object
 	 */
     public function getdata(){
+        $receiverDeleteFilter = DB::getSchemaBuilder()->hasColumn('receiver', 'is_delete') ? 'where receiver.is_delete = 0' : '';
+
         $data = DB::select("select receiver.*
         from receiver
-        where receiver.is_delete = 0"); 
+        $receiverDeleteFilter");
         return Datatables::of($data)
        
 		->addColumn( 'action', function ( $accountsingle ) {
@@ -51,7 +53,11 @@ class Receiver extends Controller
 	 * @return object
 	 */
     public function getrows(){
-        $data = DB::table('receiver')->where('is_delete', 0)->get();
+        $query = DB::table('receiver');
+        if (DB::getSchemaBuilder()->hasColumn('receiver', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ( $data ) {
 			$res['success'] = true;
 			$res['message']= $data;

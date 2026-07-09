@@ -36,9 +36,11 @@ class Category extends Controller
      */
     public function getdata()
     {
+        $categoryDeleteFilter = DB::getSchemaBuilder()->hasColumn('category', 'is_delete') ? 'where is_delete = 0' : '';
+
         $data = DB::select("select *
         from category
-        where is_delete = 0");
+        $categoryDeleteFilter");
         return Datatables::of($data)
 
             ->addColumn('action', function ($accountsingle) {
@@ -55,7 +57,11 @@ class Category extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('category')->where('is_delete', 0)->get();
+        $query = DB::table('category');
+        if (DB::getSchemaBuilder()->hasColumn('category', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;

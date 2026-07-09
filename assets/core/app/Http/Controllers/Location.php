@@ -33,7 +33,10 @@ class Location extends Controller
 	 * @return object
 	 */
     public function getdata(){
-        $data = DB::table('location')->select(['location.*'])->where('is_delete', 0);
+        $data = DB::table('location')->select(['location.*']);
+        if (DB::getSchemaBuilder()->hasColumn('location', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
 		return Datatables::of($data)
 		->addColumn( 'action', function ( $accountsingle ) {
             return '<a href="#" id="btnedit" customdata='.$accountsingle->id.' class="btn btn-sm btn-primary" data-toggle="modal" data-target="#edit"><i class="fa fa-pencil"></i> '. trans('lang.edit').'</a>
@@ -46,7 +49,11 @@ class Location extends Controller
 	 * @return object
 	 */
     public function getrows(){
-        $data = DB::table('location')->where('is_delete', 0)->get();
+        $query = DB::table('location');
+        if (DB::getSchemaBuilder()->hasColumn('location', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ( $data ) {
 			$res['success'] = true;
 			$res['message']= $data;

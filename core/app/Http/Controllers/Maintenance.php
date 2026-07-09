@@ -36,12 +36,21 @@ class Maintenance extends Controller
      */
     public function getdata()
     {
-        $data = DB::select("select maintenance.*, supplier.name as supplier, assets.name as asset, assets.id as assetsid, assets.assettag, receiver.fullname
+        $maintenanceDeleteFilter = DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete') ? 'and maintenance.is_delete = 0' : '';
+
+        $data = DB::select("select maintenance.*, supplier.name as supplier, assets.name as asset, assets.id as assetsid, assets.assettag,
+        CASE
+            WHEN maintenance.type = 'Unserviceable' THEN IFNULL(employees.fullname, receiver.fullname)
+            ELSE IFNULL(receiver.fullname, employees.fullname)
+        END as fullname
         from maintenance left join supplier 
         on maintenance.supplierid = supplier.id left join assets 
         on maintenance.assetid = assets.id left join receiver
         on maintenance.created_by = receiver.id
+        left join employees
+        on maintenance.created_by = employees.id
         where maintenance.type != 'Operational'
+        $maintenanceDeleteFilter
         order by maintenance.created_at desc");
         return Datatables::of($data)
             ->addColumn('action', function ($accountsingle) {
@@ -73,7 +82,11 @@ class Maintenance extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('maintenance')->get();
+        $query = DB::table('maintenance');
+        if (DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;
@@ -91,7 +104,11 @@ class Maintenance extends Controller
     {
         $id            = $request->input('id');
 
-        $data = DB::table('maintenance')->where('id', $id)->first();
+        $query = DB::table('maintenance')->where('id', $id);
+        if (DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->first();
 
         if ($data) {
             $res['success'] = 'success';
@@ -111,12 +128,14 @@ class Maintenance extends Controller
     public function assetsbyid(Request $request)
     {
         $id            = $request->input('assetid');
+        $maintenanceDeleteFilter = DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete') ? 'and maintenance.is_delete = 0' : '';
 
         $data = DB::select("select maintenance.*, supplier.name as supplier, assets.name as asset, assets.assettag as assettag
         from maintenance left join supplier 
         on maintenance.supplierid = supplier.id
         left join assets 
         on maintenance.assetid = assets.id where maintenance.assetid = '$id'
+        $maintenanceDeleteFilter
         order by maintenance.created_at desc");
         return Datatables::of($data)
             ->make(true);
@@ -157,6 +176,9 @@ class Maintenance extends Controller
             'created_at' => $created_at,
             'updated_at' => $updated_at
         );
+        if (DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete')) {
+            $data['is_delete'] = 0;
+        }
 
         $insert         = DB::table('maintenance')->insert($data);
         $update = DB::table('assets')->where('id', $assetid)
@@ -198,19 +220,22 @@ class Maintenance extends Controller
         // dd($request->input('startdate'));
         $enddate        = $request->input('enddate');
         $updated_at     = date("Y-m-d H:i:s");
-        $update = DB::table('maintenance')->where('id', $id)
-            ->update(
-                [
-                    'assetid'       => $assetid,
-                    'type'          => $type,
-                    // 'supplierid'    => $supplierid,
-                    'mamount'       => $mamount,
-                    'reason_remarks' => $reason_remarks,
-                    'startdate'     => $updated_at,
-                    'enddate'       => $enddate,
-                    'updated_at'    => $updated_at
-                ]
-            );
+        $query = DB::table('maintenance')->where('id', $id);
+        if (DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $update = $query->update(
+            [
+                'assetid'       => $assetid,
+                'type'          => $type,
+                // 'supplierid'    => $supplierid,
+                'mamount'       => $mamount,
+                'reason_remarks' => $reason_remarks,
+                'startdate'     => $startdate,
+                'enddate'       => $enddate,
+                'updated_at'    => $updated_at
+            ]
+        );
 
         if ($type == "Operational") {
             $update1 = DB::table('assets')->where('id', $assetid)
@@ -241,7 +266,8 @@ class Maintenance extends Controller
     public function delete(Request $request)
     {
         $id = $request->input('id');
-        $delete = DB::table('maintenance')->where('id', $id)->delete();
+        $delete = DB::table('maintenance')->where('id', $id)->where('is_delete', 0)
+            ->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
         if ($delete) {
             $res['success'] = 'success';
         } else {

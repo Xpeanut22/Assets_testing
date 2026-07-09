@@ -32,7 +32,10 @@ class Supplier extends Controller
 	 * @return object
 	 */
     public function getdata(){
-        $data = DB::table('supplier')->select(['supplier.*'])->where('is_delete', 0);
+        $data = DB::table('supplier')->select(['supplier.*']);
+        if (DB::getSchemaBuilder()->hasColumn('supplier', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
         return Datatables::of($data)
        
 		->addColumn( 'action', function ( $accountsingle ) {
@@ -48,7 +51,11 @@ class Supplier extends Controller
 	 * @return object
 	 */
     public function getrows(){
-        $data = DB::table('supplier')->where('is_delete', 0)->get();
+        $query = DB::table('supplier');
+        if (DB::getSchemaBuilder()->hasColumn('supplier', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ( $data ) {
 			$res['success'] = true;
 			$res['message']= $data;

@@ -897,8 +897,36 @@ class Inventory extends Controller
     {
         $from = $request->input('datefrom');
         $to = $request->input('dateto');
+        $fromDate = str_replace('T', ' ', $from);
+        $toDate = str_replace('T', ' ', $to);
 
-        // Fetch the data
+        $masterItems = DB::table(DB::raw("(
+                SELECT assets.name as item_name,
+                    SUM(CAST(assets.quantity AS DECIMAL(20,2))) as allQuantity,
+                    MAX(assets_units.unit) as unit
+                FROM assets
+                LEFT JOIN units as assets_units ON assets_units.id = assets.unit
+                WHERE assets.typeid != 7
+                GROUP BY assets.name
+                UNION ALL
+                SELECT component.name as item_name,
+                    SUM(CAST(component.quantity AS DECIMAL(20,2))) as allQuantity,
+                    MAX(component_units.unit) as unit
+                FROM component
+                LEFT JOIN units as component_units ON component_units.id = component.unit
+                GROUP BY component.name
+            ) as inventory_items"))
+            ->select(
+                'item_name',
+                DB::raw('SUM(allQuantity) as allQuantity'),
+                DB::raw("COALESCE(MAX(unit), '') as unit")
+            )
+            ->whereNotNull('item_name')
+            ->groupBy('item_name')
+            ->orderBy('item_name')
+            ->get();
+
+        // Fetch actual count logs within the selected date range.
         $data = DB::table('inventory')
             ->leftJoin('receiver', 'inventory.created_by', '=', 'receiver.id')
             ->leftJoin('assets', 'inventory.item', '=', 'assets.assettag')
@@ -908,18 +936,18 @@ class Inventory extends Controller
             ->leftJoin('units as component_units', 'component_units.id', '=', 'component.unit')
 
 
-            ->whereBetween('inventory.created_at', [$from, $to])
+            ->whereBetween('inventory.created_at', [$fromDate, $toDate])
             ->select(
                 'inventory.item',
                 DB::raw('SUM(inventory.quantity) as total_quantity'),
-                DB::raw('COALESCE(component.name, assets.name) as item_name'),
+                DB::raw('COALESCE(component.name, assets.name, inventory.equipment_name, inventory.item) as item_name'),
                 'inventory.created_at',
                 'receiver.fullname',
                 'asset_type.description',
                 DB::raw('COALESCE(assets.quantity, component.quantity) as allQuantity'),
                 DB::raw('COALESCE(assets_units.unit, component_units.unit) as unit')
             )
-            ->groupBy(DB::raw('COALESCE(component.name, assets.name)'), 'inventory.created_at', 'receiver.fullname', 'asset_type.description')
+            ->groupBy(DB::raw('COALESCE(component.name, assets.name, inventory.equipment_name, inventory.item)'), 'inventory.created_at', 'receiver.fullname', 'asset_type.description', 'inventory.item', 'assets.quantity', 'component.quantity', 'assets_units.unit', 'component_units.unit')
             ->get();
         // Determine unique dates with content
         $datesWithContent = $data->map(function ($item) {
@@ -939,8 +967,8 @@ class Inventory extends Controller
         $rowShifts = 4; // Row for shift headers
         $shiftTimes = ['6-2', '2-10', '10-6'];
 
-        $currentDate = new \DateTime($from);
-        $endDate = new \DateTime($to);
+        $currentDate = new \DateTime($fromDate);
+        $endDate = new \DateTime($toDate);
 
         $columnIndex = 5; // Starting column (E)
 
@@ -1160,16 +1188,30 @@ class Inventory extends Controller
 
         // Process data
         $itemQuantities = [];
+        $itemDetails = [];
+
+        foreach ($masterItems as $item) {
+            $itemName = $item->item_name;
+            $itemQuantities[$itemName] = [];
+            $itemDetails[$itemName] = [
+                'unit' => $item->unit,
+                'allQuantity' => $item->allQuantity
+            ];
+        }
 
         foreach ($data as $row) {
             $itemName = $row->item_name;
-            $unit = $row->unit;
-            $allQuantity = $row->allQuantity;
             $date = (new \DateTime($row->created_at))->format('Y-m-d');
             $quantity = $row->total_quantity;
 
             if (!isset($itemQuantities[$itemName])) {
                 $itemQuantities[$itemName] = [];
+            }
+            if (!isset($itemDetails[$itemName])) {
+                $itemDetails[$itemName] = [
+                    'unit' => $row->unit,
+                    'allQuantity' => $row->allQuantity
+                ];
             }
 
             if (!isset($itemQuantities[$itemName][$date])) {
@@ -1187,8 +1229,9 @@ class Inventory extends Controller
 
         foreach ($itemQuantities as $itemName => $dates) {
             $sheet->setCellValueByColumnAndRow(4, $rowStart, $itemName);
-            $sheet->setCellValueByColumnAndRow(3, $rowStart, $unit);
-            $sheet->setCellValueByColumnAndRow(2, $rowStart, $allQuantity);
+            $sheet->setCellValueByColumnAndRow(3, $rowStart, $itemDetails[$itemName]['unit'] ?? '');
+            $sheet->setCellValueByColumnAndRow(2, $rowStart, $itemDetails[$itemName]['allQuantity'] ?? '');
+            $sheet->setCellValueByColumnAndRow(1, $rowStart, $rowStart - 4);
 
 
              // Set item name in column D

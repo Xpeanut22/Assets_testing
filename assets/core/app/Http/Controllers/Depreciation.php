@@ -36,8 +36,10 @@ class Depreciation extends Controller
         $data = DB::table('depreciation')
                 ->select('depreciation.*', 'assets.name as asset', 'assets.id as assetid', 'assets.cost as assetcost', 'component.id as componentid', 'component.name as component', 'component.cost as componentcost')
                 ->leftjoin('assets', 'depreciation.assetid', '=', 'assets.id')
-                ->leftjoin('component', 'depreciation.componentid', '=', 'component.id')
-                ->where('depreciation.is_delete', 0);
+                ->leftjoin('component', 'depreciation.componentid', '=', 'component.id');
+        if (DB::getSchemaBuilder()->hasColumn('depreciation', 'is_delete')) {
+            $data->where('depreciation.is_delete', 0);
+        }
 		return Datatables::of($data)
         ->addColumn('name', function ( $accountsingle ) {
             if($accountsingle->asset !='' || $accountsingle->asset !=NULL){
@@ -81,7 +83,11 @@ class Depreciation extends Controller
 	 * @return object
 	 */
     public function getrows(){
-        $data = DB::table('depreciation')->where('is_delete', 0)->get();
+        $query = DB::table('depreciation');
+        if (DB::getSchemaBuilder()->hasColumn('depreciation', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ( $data ) {
 			$res['success'] = true;
 			$res['message']= $data;

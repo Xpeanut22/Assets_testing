@@ -34,7 +34,10 @@ class AssetType extends Controller
 	 * @return object
 	 */
     public function getdata(){
-        $data = DB::table('asset_type')->select(['asset_type.*'])->where('is_delete', 0);
+        $data = DB::table('asset_type')->select(['asset_type.*']);
+        if (DB::getSchemaBuilder()->hasColumn('asset_type', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
 		return Datatables::of($data)
 		->addColumn( 'action', function ( $accountsingle ) {
             return '<a href="#" id="btnedit" customdata='.$accountsingle->id.' class="btn btn-sm btn-primary" data-toggle="modal" data-target="#edit"><i class="fa fa-pencil"></i> '. trans('lang.edit').'</a>
@@ -47,7 +50,11 @@ class AssetType extends Controller
 	 * @return object
 	 */
     public function getrows(){
-        $data = DB::table('asset_type')->where('is_delete', 0)->get();
+        $query = DB::table('asset_type');
+        if (DB::getSchemaBuilder()->hasColumn('asset_type', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ( $data ) {
 			$res['success'] = true;
 			$res['message']= $data;

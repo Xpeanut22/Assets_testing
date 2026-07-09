@@ -64,6 +64,7 @@ class Asset extends Controller
      */
     public function getdata()
     {
+        $assetDeleteFilter = DB::getSchemaBuilder()->hasColumn('assets', 'is_delete') ? 'AND assets.is_delete = 0' : '';
 
         $data = DB::select("
     SELECT 
@@ -90,7 +91,7 @@ class Asset extends Controller
         ) a2 ON a1.assetid = a2.assetid AND a1.id = a2.max_id
     ) ah ON ah.assetid = assets.id
     WHERE assets.typeid != 7
-    AND assets.is_delete = 0
+    $assetDeleteFilter
     ORDER BY assets.created_at DESC
 ");
         return Datatables::of($data)
@@ -135,6 +136,10 @@ class Asset extends Controller
 
     public function getGroupedAssets()
     {
+        $hasAssetDeleteColumn = DB::getSchemaBuilder()->hasColumn('assets', 'is_delete');
+        $assetDeleteFilter = $hasAssetDeleteColumn ? 'AND is_delete = 0' : '';
+        $assetAliasDeleteFilter = $hasAssetDeleteColumn ? 'AND a.is_delete = 0' : '';
+
         $data = DB::select("
         SELECT 
             a.name,
@@ -143,7 +148,7 @@ class Asset extends Controller
                 SELECT picture 
                 FROM assets 
                 WHERE name = a.name
-                AND is_delete = 0
+                $assetDeleteFilter
                 AND picture IS NOT NULL 
                 LIMIT 1
             ) as picture,
@@ -151,11 +156,11 @@ class Asset extends Controller
                 SELECT GROUP_CONCAT(assettag SEPARATOR ',') 
                 FROM assets 
                 WHERE name = a.name
-                AND is_delete = 0
+                $assetDeleteFilter
             ) as all_tags
         FROM assets a
         WHERE a.typeid != 7
-        AND a.is_delete = 0
+        $assetAliasDeleteFilter
         GROUP BY a.name
         ORDER BY a.name
     ");
@@ -177,6 +182,8 @@ class Asset extends Controller
 
     public function getAssetsByName($name)
     {
+        $assetDeleteFilter = DB::getSchemaBuilder()->hasColumn('assets', 'is_delete') ? 'AND assets.is_delete = 0' : '';
+
         $data = DB::select("
         SELECT 
             assets.*, 
@@ -202,7 +209,7 @@ class Asset extends Controller
             ) a2 ON a1.assetid = a2.assetid AND a1.id = a2.max_id
         ) ah ON ah.assetid = assets.id
         WHERE assets.name = ?
-        AND assets.is_delete = 0
+        $assetDeleteFilter
     ", [$name]);
 
         foreach ($data as $row) {
@@ -1353,11 +1360,29 @@ return response($pdf->Output('S'), 200)
      */
     public function getrows()
     {
-        $data = DB::table('assets')->where('is_delete', 0)->get();
+        $query = DB::table('assets');
+        if (DB::getSchemaBuilder()->hasColumn('assets', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;
         }
+        return response($res);
+    }
+
+    public function generateproductcode()
+    {
+        $lastid = DB::table('assets')->orderBy('id', 'desc')->first();
+
+        if ($lastid) {
+            $res['success'] = 'success';
+            $res['message'] = 'AST' . date('ymd') . $lastid->id;
+        } else {
+            $res['message'] = 'AST' . date('ymd') . '1';
+        }
+
         return response($res);
     }
 
@@ -1473,11 +1498,13 @@ return response($pdf->Output('S'), 200)
     public function scannerdata(Request $request)
     {
         $input = $request->input('input');
+        $assetDeleteFilter = DB::getSchemaBuilder()->hasColumn('assets', 'is_delete') ? 'and a.is_delete = 0' : '';
+
         $isValid = DB::select("select a.*,b.*
         from assets as a left join asset_history as b
         on b.assetid = a.id
         where a.assettag = '$input'
-        and a.is_delete = 0");
+        $assetDeleteFilter");
 
         return response()->json(['isValid' => $isValid]);
     }

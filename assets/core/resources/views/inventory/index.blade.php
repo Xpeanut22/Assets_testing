@@ -457,13 +457,6 @@
         }
     });
 
-    document.getElementById('printInventory').addEventListener('click', function () {
-        var form = document.getElementById('formcheckout');
-        form.submit();
-    });
-
-
-
     $.ajax({
         type: "GET",
         url: "{{ url('listreceiver')}}",

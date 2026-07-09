@@ -37,7 +37,10 @@ class User extends Controller
      */
     public function getdata()
     {
-        $data = DB::table('users')->select(['users.*'])->where('is_delete', 0);
+        $data = DB::table('users')->select(['users.*']);
+        if (DB::getSchemaBuilder()->hasColumn('users', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
         return Datatables::of($data)
             ->addColumn('status', function ($single) {
                 $status = '';
@@ -73,7 +76,11 @@ class User extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('users')->where('is_delete', 0)->get();
+        $query = DB::table('users');
+        if (DB::getSchemaBuilder()->hasColumn('users', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;

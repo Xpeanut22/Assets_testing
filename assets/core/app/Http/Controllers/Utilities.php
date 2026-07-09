@@ -88,7 +88,11 @@ class Utilities extends Controller
             ->addColumn('status', function ($accountsingle) {
 
 
-                if ($accountsingle->status == 2) {
+                if ($accountsingle->status == 4) {
+                    $status = '<span class="badge badge-data text-white background-red">' . trans('lang.unserviceable') . '</span>';
+                } elseif ($accountsingle->status == 3) {
+                    $status = '<span class="badge badge-data text-white background-green">' . trans('lang.serviceable') . '</span>';
+                } elseif ($accountsingle->status == 2) {
 
                     $status = '<span class="badge badge-data text-white background-blue">' . trans('lang.checkin') . '</span>';
                 } else {
@@ -199,7 +203,7 @@ class Utilities extends Controller
                     $status = trans('lang.lost');
                 }
                 if ($single->status == '6') {
-                    $status = trans('lang.outofrepair');
+                    $status = trans('lang.unserviceable');
                 }
 
                 return $status;

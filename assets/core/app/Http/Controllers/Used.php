@@ -36,9 +36,11 @@ class Used extends Controller
      */
     public function getdata()
     {
+        $usedDeleteFilter = DB::getSchemaBuilder()->hasColumn('used', 'is_delete') ? 'where is_delete = 0' : '';
+
         $data = DB::select("select *
         from used
-        where is_delete = 0");
+        $usedDeleteFilter");
         return Datatables::of($data)
 
             ->addColumn('action', function ($accountsingle) {
@@ -55,7 +57,11 @@ class Used extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('used')->where('is_delete', 0)->get();
+        $query = DB::table('used');
+        if (DB::getSchemaBuilder()->hasColumn('used', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;

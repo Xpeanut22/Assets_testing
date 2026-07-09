@@ -63,22 +63,32 @@ class Reports extends Controller
 	 */
     public function getassetactivityreport(){
         $data = DB::table('asset_history')
-        ->select('asset_history.*', 'assets.assettag as tag', 'assets.status as itemstatus', 'assets.name as asset', 'employees.fullname as employees', 'asset_type.name as type', 'location.name as location','receiver.fullname')
+        ->select('asset_history.*', 'assets.assettag as tag', 'assets.status as itemstatus', 'assets.name as asset', DB::raw("COALESCE(NULLIF(employees.fullname, ''), '-') as employees"), 'asset_type.name as type', 'location.name as location', DB::raw("COALESCE(NULLIF(users.fullname, ''), NULLIF(receiver.fullname, ''), '-') as fullname"))
         ->leftJoin('assets', 'assets.id', '=', 'asset_history.assetid')
         ->leftJoin('asset_type', 'assets.typeid', '=', 'asset_type.id')
         ->leftJoin('employees', 'employees.id', '=', 'asset_history.employeeid')
         ->leftJoin('location', 'location.id', '=', 'assets.locationid')
+        ->leftJoin('users', 'users.id', '=', 'asset_history.created_by')
         ->leftJoin('receiver', 'receiver.id', '=', 'asset_history.created_by')
 		->orderBy('asset_history.updated_at', 'desc')
 		->orderBy('asset_history.created_at', 'desc')
 		->get();
 
         return Datatables::of($data)
+        ->addColumn( 'historystatus', function ( $accountsingle ) {
+            return $accountsingle->status;
+        } )
         
         ->addColumn( 'status', function ( $accountsingle ) {
            
 
-            if($accountsingle->status==2){
+            if($accountsingle->status==4){
+                    $status = '<span class="badge badge-data text-white background-red">'.trans('lang.unserviceable').'</span>';
+
+            } elseif($accountsingle->status==3){
+                    $status = '<span class="badge badge-data text-white background-green">'.trans('lang.serviceable').'</span>';
+
+            } elseif($accountsingle->status==2){
                     
                     $status = '<span class="badge badge-data text-white background-blue">'.trans('lang.checkin').'</span>';
                 
@@ -190,7 +200,7 @@ class Reports extends Controller
                 $status = trans('lang.lost');
             }
             if($single->status=='6'){
-                $status = trans('lang.outofrepair');
+                $status = trans('lang.unserviceable');
             }
 
             return $status;
