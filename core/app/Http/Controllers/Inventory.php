@@ -900,33 +900,7 @@ class Inventory extends Controller
         $fromDate = str_replace('T', ' ', $from);
         $toDate = str_replace('T', ' ', $to);
 
-        $masterItems = DB::table(DB::raw("(
-                SELECT assets.name as item_name,
-                    SUM(CAST(assets.quantity AS DECIMAL(20,2))) as allQuantity,
-                    MAX(assets_units.unit) as unit
-                FROM assets
-                LEFT JOIN units as assets_units ON assets_units.id = assets.unit
-                WHERE assets.typeid != 7
-                GROUP BY assets.name
-                UNION ALL
-                SELECT component.name as item_name,
-                    SUM(CAST(component.quantity AS DECIMAL(20,2))) as allQuantity,
-                    MAX(component_units.unit) as unit
-                FROM component
-                LEFT JOIN units as component_units ON component_units.id = component.unit
-                GROUP BY component.name
-            ) as inventory_items"))
-            ->select(
-                'item_name',
-                DB::raw('SUM(allQuantity) as allQuantity'),
-                DB::raw("COALESCE(MAX(unit), '') as unit")
-            )
-            ->whereNotNull('item_name')
-            ->groupBy('item_name')
-            ->orderBy('item_name')
-            ->get();
-
-        // Fetch actual count logs within the selected date range.
+        // Fetch only actual count logs within the selected date range.
         $data = DB::table('inventory')
             ->leftJoin('receiver', 'inventory.created_by', '=', 'receiver.id')
             ->leftJoin('assets', 'inventory.item', '=', 'assets.assettag')
@@ -1189,15 +1163,6 @@ class Inventory extends Controller
         // Process data
         $itemQuantities = [];
         $itemDetails = [];
-
-        foreach ($masterItems as $item) {
-            $itemName = $item->item_name;
-            $itemQuantities[$itemName] = [];
-            $itemDetails[$itemName] = [
-                'unit' => $item->unit,
-                'allQuantity' => $item->allQuantity
-            ];
-        }
 
         foreach ($data as $row) {
             $itemName = $row->item_name;
