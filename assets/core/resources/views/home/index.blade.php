@@ -154,7 +154,7 @@
                                     <tr>
                                         <th>ID</th>
                                         <th><?php echo trans('lang.asset');?></th>
-                                        <th><?php echo trans('lang.employee');?></th>
+                                        <th>Name</th>
                                         <th><?php echo trans('lang.status');?></th>
                                         <th><?php echo trans('lang.location');?></th>
                                         <th><?php echo trans('lang.date');?></th>
@@ -164,7 +164,7 @@
                                     <tr>
                                         <th>ID</th>
                                         <th><?php echo trans('lang.asset');?></th>
-                                        <th><?php echo trans('lang.employee');?></th>
+                                        <th>Name</th>
                                         <th><?php echo trans('lang.status');?></th>
                                         <th><?php echo trans('lang.location');?></th>
                                         <th><?php echo trans('lang.date');?></th>

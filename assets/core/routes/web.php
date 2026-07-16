@@ -38,6 +38,8 @@ Route::get('/assetlist/generatelabel/{id}', 'Asset@generatelabel');
 Route::get('/assetvehiclelist','AssetVehicle@index');
 Route::get('/assetvehiclelist/detail/{id}','AssetVehicle@detail');
 Route::get('/assetvehiclelist/generatelabel/{id}', 'AssetVehicle@generatelabel');
+Route::get('/assetvehiclelist/borrowedform/{id}', 'AssetVehicle@borrowedform');
+Route::get('/assetvehiclelist/returnform/{id}', 'AssetVehicle@returnform');
 Route::get('/componentlist','Component@index');
 Route::get('/componentlist/generatelabel/{id}', 'Component@generatelabel');
 Route::get('/componentlist/detail/{componentid}','Component@detail');

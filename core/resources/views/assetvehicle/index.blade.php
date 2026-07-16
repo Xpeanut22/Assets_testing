@@ -556,7 +556,7 @@
 
     <!--add checkout -->
     <div id="checkout" class="modal fade" role="dialog">
-        <div class="modal-dialog ">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form action="#" id="formcheckout" enctype="multipart/form-data" autocomplete="off">
                     <div class="modal-header">
@@ -574,17 +574,16 @@
                                 <input name="assettag" type="text" readonly id="checkoutassettag" class=" form-control" required placeholder="<?php echo trans('lang.assettag'); ?>" />
                             </div>
                             <div class="form-group col-md-12">
-                                <label><?php echo trans('lang.asset'); ?></label>
-                                <input name="asset" type="text" readonly id="checkoutname" class=" form-control" required placeholder="<?php echo trans('lang.asset'); ?>" />
+                                <label>Asset Vehicle</label>
+                                <input name="asset" type="text" readonly id="checkoutname" class=" form-control" required placeholder="Asset Vehicle" />
                             </div>
 
                         </div>
                         <div class="form-row">
                             <div class="form-group col-md-12">
-                                <label id="borrowername">Name</label>
-                                <select name="employeeid" id="checkoutemployeeid" required class="select2 selectCreate">
-                                    <option value=""><?php echo trans('lang.employee'); ?></option>
-                                </select>
+                                <label id="borrowername">Custodian Name</label>
+                                <input type="text" class="form-control" readonly value="{{ Auth::user()->fullname }}" />
+                                <input type="hidden" name="employeeid" id="checkoutemployeeid" value="0" />
                             </div>
                         </div>
 
@@ -597,6 +596,98 @@
                                     <option value="serviceable"><?php echo trans('lang.serviceable'); ?></option>
                                     <option value="unserviceable"><?php echo trans('lang.unserviceable'); ?></option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div id="checkouttriprow">
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label>Control #</label>
+                                    <input name="controlno" type="text" id="checkoutcontrolno" class="form-control" readonly placeholder="Control Number" />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Name of Driver</label>
+                                    <input name="name_of_driver" type="text" id="checkoutdriver" class="form-control" placeholder="Name of Driver" />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Phone #</label>
+                                    <input name="phone" type="text" id="checkoutphone" class="form-control number-only" inputmode="numeric" placeholder="Phone #" />
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label>Destination(s)</label>
+                                    <input name="destination" type="text" id="checkoutdestination" class="form-control" placeholder="Destination(s)" />
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Purpose(s)</label>
+                                    <input name="purpose" type="text" id="checkoutpurpose" class="form-control" placeholder="Purpose(s)" />
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label>Date Borrowed</label>
+                                    <input name="date_borrowed" type="text" readonly id="checkoutdateborrowed" class="form-control" placeholder="Date Borrowed" />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Time of Departure</label>
+                                    <input name="time_of_departure" type="text" readonly id="checkoutdeparture" class="form-control" placeholder="Time of Departure" />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Departure Mileage</label>
+                                    <input name="departure_mileage" type="text" id="checkoutmileage" class="form-control number-only" inputmode="numeric" placeholder="Departure Mileage" />
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label>Division</label>
+                                    <div class="input-group">
+                                        <input type="text" id="checkoutdivisioninput" class="form-control" placeholder="Division" />
+                                        <span class="input-group-btn">
+                                            <button type="button" class="btn btn-primary" id="addcheckoutdivision">Add</button>
+                                        </span>
+                                    </div>
+                                    <div id="checkoutdivisionlist" class="border rounded p-2 mt-2 text-muted" style="min-height: 38px; max-height: 190px; overflow-y: auto; font-size: 14px; line-height: 1.8;">No division added</div>
+                                    <input name="division_1" type="hidden" id="checkoutdivision1" />
+                                    <input name="division_2" type="hidden" id="checkoutdivision2" />
+                                    <input name="division_3" type="hidden" id="checkoutdivision3" />
+                                    <input name="divisions_json" type="hidden" id="checkoutdivisionsjson" />
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Passenger</label>
+                                    <div class="input-group">
+                                        <input type="text" id="checkoutpassengerinput" class="form-control" placeholder="Passenger" />
+                                        <span class="input-group-btn">
+                                            <button type="button" class="btn btn-primary" id="addcheckoutpassenger">Add</button>
+                                        </span>
+                                    </div>
+                                    <div id="checkoutpassengerlist" class="border rounded p-2 mt-2 text-muted" style="min-height: 38px; max-height: 190px; overflow-y: auto; font-size: 14px; line-height: 1.8;">No passenger added</div>
+                                    <input name="passenger_1" type="hidden" id="checkoutpassenger1" />
+                                    <input name="passenger_2" type="hidden" id="checkoutpassenger2" />
+                                    <input name="passenger_3" type="hidden" id="checkoutpassenger3" />
+                                    <input name="passengers_json" type="hidden" id="checkoutpassengersjson" />
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-md-6">
+                                    <label>Borrower Name</label>
+                                    <input name="borrower_signature_name" type="text" id="checkoutsignature" class="form-control" placeholder="Borrower Name" />
+                                </div>
+                                <div class="form-group col-md-6">
+                                    <label>Supervising Officer</label>
+                                    <input name="supervising_officer" type="text" id="checkoutsupervising" class="form-control" placeholder="Supervising Officer" />
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-md-12">
+                                    <label>Remarks</label>
+                                    <textarea name="trip_remarks" id="checkouttripremarks" class="form-control" rows="5" placeholder="Remarks"></textarea>
+                                </div>
                             </div>
                         </div>
 
@@ -632,7 +723,7 @@
 
     <!--add checkin -->
     <div id="checkin" class="modal fade" role="dialog">
-        <div class="modal-dialog ">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <form action="#" id="formcheckin" enctype="multipart/form-data" autocomplete="off">
                     <div class="modal-header">
@@ -647,17 +738,16 @@
                                 <input name="assettag" type="text" readonly id="checkinassettag" class=" form-control" required placeholder="<?php echo trans('lang.assettag'); ?>" />
                             </div>
                             <div class="form-group col-md-12">
-                                <label><?php echo trans('lang.asset'); ?></label>
-                                <input name="asset" type="text" readonly id="checkinname" class=" form-control" required placeholder="<?php echo trans('lang.asset'); ?>" />
+                                <label>Asset Vehicle</label>
+                                <input name="asset" type="text" readonly id="checkinname" class=" form-control" required placeholder="Asset Vehicle" />
                             </div>
 
                         </div>
                         <div class="form-row">
                             <div class="form-group col-md-12">
-                                <label id="returnname">Name</label>
-                                <select name="employeeid1" id="checkoutemployeeid1" required class="select2 selectCreate">
-                                    <option value=""><?php echo trans('lang.employee'); ?></option>
-                                </select>
+                                <label id="returnname">Custodian Name</label>
+                                <input type="text" class="form-control" readonly value="{{ Auth::user()->fullname }}" />
+                                <input type="hidden" name="employeeid1" id="checkoutemployeeid1" value="0" />
                             </div>
                         </div>
 
@@ -670,6 +760,41 @@
                                     <option value="serviceable"><?php echo trans('lang.serviceable'); ?></option>
                                     <option value="unserviceable"><?php echo trans('lang.unserviceable'); ?></option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div id="checkintriprow">
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label>Control #</label>
+                                    <input type="text" id="checkincontrolno" class="form-control" readonly placeholder="Control Number" />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Date Return</label>
+                                    <input name="date_return" type="text" readonly id="checkindatereturn" class="form-control" placeholder="Date Return" />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Time of Arrival</label>
+                                    <input name="time_of_arrival" type="text" readonly id="checkinarrival" class="form-control" placeholder="Time of Arrival" />
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label>Returning Name</label>
+                                    <input name="returning_signature_name" type="text" id="checkinreturningname" class="form-control" placeholder="Returning Name" />
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Arrival Mileage</label>
+                                    <input name="arrival_mileage" type="text" id="checkinmileage" class="form-control number-only" inputmode="numeric" placeholder="Arrival Mileage" />
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group col-md-12">
+                                    <label>Remarks</label>
+                                    <textarea name="return_remarks" id="checkinreturnremarks" class="form-control" rows="5" placeholder="Remarks"></textarea>
+                                </div>
                             </div>
                         </div>
 
@@ -782,9 +907,6 @@
             width: 'resolve'
         });
 
-        var loggedInUserId = "{{ Auth::user()->fullname }}";
-
-
         $(document).ready(function() {
             var today = new Date();
 
@@ -802,12 +924,135 @@
             $('#checkindate').val(formattedDateTime);
             $('#checkoutdate').val(formattedDateTime);
 
+            function currentTimeValue() {
+                var now = new Date();
+                var hours = now.getHours();
+                var minutes = String(now.getMinutes()).padStart(2, '0');
+                var suffix = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12;
+                hours = hours ? hours : 12;
+                return String(hours).padStart(2, '0') + ':' + minutes + ' ' + suffix;
+            }
+
+            function generateVehicleControlNumber() {
+                $.ajax({
+                    type: "GET",
+                    url: "{{ url('generateControlNumber') }}",
+                    data: {
+                        prefix: 'BF'
+                    },
+                    dataType: "JSON",
+                    success: function(data) {
+                        if (data && data.success) {
+                            $("#checkoutcontrolno").val(data.message);
+                        }
+                    }
+                });
+            }
+
+            var checkoutDivisionItems = [];
+            var checkoutPassengerItems = [];
+
+            function renderTripItems(type) {
+                var items = type === 'division' ? checkoutDivisionItems : checkoutPassengerItems;
+                var listSelector = type === 'division' ? '#checkoutdivisionlist' : '#checkoutpassengerlist';
+                var hiddenPrefix = type === 'division' ? '#checkoutdivision' : '#checkoutpassenger';
+                var jsonSelector = type === 'division' ? '#checkoutdivisionsjson' : '#checkoutpassengersjson';
+                var emptyText = type === 'division' ? 'No division added' : 'No passenger added';
+
+                for (var i = 1; i <= 3; i++) {
+                    $(hiddenPrefix + i).val(items[i - 1] || '');
+                }
+                $(jsonSelector).val(JSON.stringify(items));
+
+                if (!items.length) {
+                    $(listSelector).addClass('text-muted').html(emptyText);
+                    return;
+                }
+
+                var html = items.map(function(item, index) {
+                    return '<div class="d-flex justify-content-between align-items-center border-bottom py-1">' +
+                        '<span>' + (index + 1) + '. ' + $('<div>').text(item).html() + '</span>' +
+                        '<button type="button" class="btn btn-xs btn-link text-danger remove-trip-item" title="Remove" data-type="' + type + '" data-index="' + index + '">&times;</button>' +
+                        '</div>';
+                }).join('');
+                $(listSelector).removeClass('text-muted').html(html);
+            }
+
+            function addTripItem(type) {
+                var items = type === 'division' ? checkoutDivisionItems : checkoutPassengerItems;
+                var inputSelector = type === 'division' ? '#checkoutdivisioninput' : '#checkoutpassengerinput';
+                var value = $.trim($(inputSelector).val());
+
+                if (!value) {
+                    return;
+                }
+
+                if (items.length >= 10) {
+                    alert('Maximum of 10 only.');
+                    return;
+                }
+
+                items.push(value);
+                $(inputSelector).val('');
+                renderTripItems(type);
+            }
+
+            function resetTripItemLists() {
+                checkoutDivisionItems = [];
+                checkoutPassengerItems = [];
+                $('#checkoutdivisioninput, #checkoutpassengerinput').val('');
+                renderTripItems('division');
+                renderTripItems('passenger');
+            }
+
+            $('#addcheckoutdivision').on('click', function() {
+                addTripItem('division');
+            });
+
+            $('#addcheckoutpassenger').on('click', function() {
+                addTripItem('passenger');
+            });
+
+            $(document).on('click', '.remove-trip-item', function() {
+                var type = $(this).data('type');
+                var index = parseInt($(this).data('index'), 10);
+                var items = type === 'division' ? checkoutDivisionItems : checkoutPassengerItems;
+
+                if (!isNaN(index)) {
+                    items.splice(index, 1);
+                    renderTripItems(type);
+                }
+            });
+
+            $('#checkoutdivisioninput').on('keypress', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    addTripItem('division');
+                }
+            });
+
+            $('#checkoutpassengerinput').on('keypress', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    addTripItem('passenger');
+                }
+            });
+
             function toggleVehicleRemarks(selectId, rowId, textareaId) {
-                var showRemarks = $('#' + selectId).val() === 'unserviceable';
+                var statusValue = $('#' + selectId).val();
+                var showRemarks = statusValue === 'unserviceable';
                 $('#' + rowId).toggle(showRemarks);
                 $('#' + textareaId).prop('required', showRemarks);
                 if (!showRemarks) {
                     $('#' + textareaId).val('');
+                }
+
+                if (selectId === 'checkoutvehiclestatus') {
+                    $('#checkouttriprow').toggle(statusValue === 'borrowed');
+                }
+                if (selectId === 'checkinvehiclestatus') {
+                    $('#checkintriprow').toggle(statusValue === 'returned');
                 }
             }
 
@@ -819,6 +1064,9 @@
                 toggleVehicleRemarks('checkinvehiclestatus', 'checkinremarksrow', 'checkinremarks');
             });
 
+            $(document).on('input', '.number-only', function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
 
             $('.select2').on('select2:select', function(e) {
                 var selectedValue = e.params.data.id;
@@ -831,12 +1079,6 @@
                     window.open(url, '_blank');
                 } else if (selectedValue === 'supplierid') {
                     var url = "{{ URL::to('supplierlist') }}";
-                    window.open(url, '_blank');
-                } else if (selectedValue === 'checkoutemployeeid') {
-                    var url = "{{ URL::to('employeeslist') }}";
-                    window.open(url, '_blank');
-                } else if (selectedValue === 'checkoutemployeeid1') {
-                    var url = "{{ URL::to('employeeslist') }}";
                     window.open(url, '_blank');
                 }
             });
@@ -1072,7 +1314,7 @@
 
 
         function showreference() {
-            $("#supplierid, #editsupplierid, #brandid, #editbrandid, #locationid, #editlocationid, #checkoutemployeeid, #checkoutemployeeid1").empty();
+            $("#supplierid, #editsupplierid, #brandid, #editbrandid, #locationid, #editlocationid").empty();
 
             //get all supplier
             $.ajax({
@@ -1158,54 +1400,6 @@
                 }
             });
 
-            //get all employee
-            $.ajax({
-                type: "GET",
-                url: "{{ url('listemployees')}}",
-                dataType: "JSON",
-                success: function(html) {
-                    $("#checkoutemployeeid").append($("<option></option>")
-                        .attr("value", "")
-                        .attr("selected", "")
-                        .attr("disabled", "")
-                        .text(""));
-                    $("#checkoutemployeeid1").append($("<option></option>")
-                        .attr("value", "")
-                        .attr("selected", "")
-                        .attr("disabled", "")
-                        .text(""));
-                    var objs = html.message;
-                    jQuery.each(objs, function(index, record) {
-                        var id = decodeURIComponent(record.id);
-                        var name = decodeURIComponent(record.fullname);
-                        $("#checkinemployeeid").append($("<option></option>")
-                            .attr("value", id)
-                            .text(name));
-                        $("#checkinemployeeid1").append($("<option></option>")
-                            .attr("value", id)
-                            .text(name));
-                        $("#checkoutemployeeid").append($("<option></option>")
-                            .attr("value", id)
-                            .text(name));
-                        $("#checkoutemployeeid1").append($("<option></option>")
-                            .attr("value", id)
-                            .text(name));
-                    });
-                    $("#checkoutemployeeid").append($("<option></option>")
-                        .attr("value", "checkoutemployeeid")
-                        .text("Add New Data"));
-                    $("#checkoutemployeeid1").append($("<option></option>")
-                        .attr("value", "checkoutemployeeid1")
-                        .text("Add New Data"));
-
-                    $('#checkoutemployeeid').select2();
-                    $('#checkoutemployeeid1').select2();
-
-                    $('#checkoutemployeeid').trigger('change');
-                    $('#checkoutemployeeid1').trigger('change');
-
-                }
-            });
         }
 
 
@@ -1636,6 +1830,12 @@
         //checkout
         $("#formcheckout").validate({
             submitHandler: function(form) {
+                var shouldOpenPrint = $("#checkoutvehiclestatus").val() === 'borrowed';
+                var printWindow = shouldOpenPrint ? window.open('', '_blank') : null;
+                if (printWindow) {
+                    printWindow.document.write('<p style="font-family: Arial; padding: 20px;">Preparing borrowed form...</p>');
+                }
+
                 $.ajax({
                     method: "POST",
                     url: "{{ url('savecheckoutvehicle')}}",
@@ -1646,10 +1846,25 @@
                         $("#checkoutsuccess").css({
                             'display': "block"
                         });
+                        if (data.print_url) {
+                            if (printWindow) {
+                                printWindow.location = data.print_url;
+                            } else {
+                                window.location.href = data.print_url;
+                                return;
+                            }
+                        } else if (printWindow) {
+                            printWindow.close();
+                        }
                         $('#checkout').modal('hide');
                         window.setTimeout(function() {
                             location.reload()
                         }, 2000)
+                    },
+                    error: function() {
+                        if (printWindow) {
+                            printWindow.close();
+                        }
                     }
                 });
             }
@@ -1659,6 +1874,12 @@
         //checkin
         $("#formcheckin").validate({
             submitHandler: function(form) {
+                var shouldOpenPrint = $("#checkinvehiclestatus").val() === 'returned';
+                var printWindow = shouldOpenPrint ? window.open('', '_blank') : null;
+                if (printWindow) {
+                    printWindow.document.write('<p style="font-family: Arial; padding: 20px;">Preparing return form...</p>');
+                }
+
                 $.ajax({
                     method: "POST",
                     url: "{{ url('savecheckinvehicle')}}",
@@ -1669,10 +1890,25 @@
                         $("#checkinsuccess").css({
                             'display': "block"
                         });
+                        if (data.print_url) {
+                            if (printWindow) {
+                                printWindow.location = data.print_url;
+                            } else {
+                                window.location.href = data.print_url;
+                                return;
+                            }
+                        } else if (printWindow) {
+                            printWindow.close();
+                        }
                         $('#checkin').modal('hide');
                         window.setTimeout(function() {
                             location.reload()
                         }, 2000)
+                    },
+                    error: function() {
+                        if (printWindow) {
+                            printWindow.close();
+                        }
                     }
                 });
             }
@@ -1697,6 +1933,12 @@
                     $("#checkoutremarks").val('');
                     $("#checkoutremarksrow").hide();
                     $("#checkoutremarks").prop('required', false);
+                    $("#checkouttriprow").show();
+                    $("#checkoutcontrolno, #checkoutdriver, #checkoutphone, #checkoutdestination, #checkoutpurpose, #checkoutdeparture, #checkoutmileage, #checkoutdivision1, #checkoutdivision2, #checkoutdivision3, #checkoutdivisionsjson, #checkoutpassenger1, #checkoutpassenger2, #checkoutpassenger3, #checkoutpassengersjson, #checkoutsignature, #checkoutsupervising, #checkouttripremarks").val('');
+                    resetTripItemLists();
+                    $("#checkoutdateborrowed").val(($("#checkoutdate").val() || '').split(' ')[0]);
+                    $("#checkoutdeparture").val(currentTimeValue());
+                    generateVehicleControlNumber();
                 }
             });
         });
@@ -1724,6 +1966,10 @@
                     $("#checkinremarks").val('');
                     $("#checkinremarksrow").hide();
                     $("#checkinremarks").prop('required', false);
+                    $("#checkintriprow").show();
+                    $("#checkindatereturn").val(($("#checkindate").val() || '').split(' ')[0]);
+                    $("#checkinarrival").val(currentTimeValue());
+                    $("#checkinmileage, #checkinreturnremarks, #checkincontrolno, #checkinreturningname").val('');
                 }
             });
         });

@@ -121,6 +121,593 @@ class AssetVehicle extends Controller
         return view('asset.generate')->with('id', $id);
     }
 
+    private function assetHistoryHasColumn($column)
+    {
+        return DB::getSchemaBuilder()->hasColumn('asset_history', $column);
+    }
+
+    private function generateVehicleTripControlNumber()
+    {
+        if (!$this->assetHistoryHasColumn('control_number')) {
+            return '';
+        }
+
+        $prefix = 'BF';
+        $year = date('y');
+        $last = DB::table('asset_history')
+            ->where('control_number', 'like', $prefix . '-' . $year . '-%')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextNumber = 1;
+        if ($last && !empty($last->control_number)) {
+            $parts = explode('-', $last->control_number);
+            $nextNumber = isset($parts[2]) ? ((int) $parts[2]) + 1 : 1;
+        }
+
+        return $prefix . '-' . $year . '-' . $nextNumber;
+    }
+
+    private function vehicleTripTicketData(Request $request)
+    {
+        $divisions = json_decode((string) $request->input('divisions_json'), true);
+        $passengers = json_decode((string) $request->input('passengers_json'), true);
+        $divisions = is_array($divisions) ? array_slice($divisions, 0, 10) : [];
+        $passengers = is_array($passengers) ? array_slice($passengers, 0, 10) : [];
+
+        return [
+            'name_of_driver' => $request->input('name_of_driver'),
+            'phone' => $request->input('phone'),
+            'destination' => $request->input('destination'),
+            'purpose' => $request->input('purpose'),
+            'date_borrowed' => $request->input('date_borrowed'),
+            'time_of_departure' => $request->input('time_of_departure') ?: date('h:i A', strtotime($request->input('checkoutdate') ?: date("Y-m-d H:i:s"))),
+            'departure_mileage' => $request->input('departure_mileage'),
+            'division_1' => $request->input('division_1'),
+            'division_2' => $request->input('division_2'),
+            'division_3' => $request->input('division_3'),
+            'divisions' => $divisions,
+            'passenger_1' => $request->input('passenger_1'),
+            'passenger_2' => $request->input('passenger_2'),
+            'passenger_3' => $request->input('passenger_3'),
+            'passengers' => $passengers,
+            'trip_remarks' => $request->input('trip_remarks'),
+            'borrower_signature_name' => $request->input('borrower_signature_name'),
+            'supervising_officer' => $request->input('supervising_officer'),
+            'custodian' => Auth::user()->fullname
+        ];
+    }
+
+    private function vehicleReturnTripTicketData(Request $request)
+    {
+        return [
+            'date_return' => $request->input('date_return'),
+            'time_of_arrival' => $request->input('time_of_arrival') ?: date('h:i A', strtotime($request->input('checkindate') ?: date("Y-m-d H:i:s"))),
+            'arrival_mileage' => $request->input('arrival_mileage'),
+            'return_remarks' => $request->input('return_remarks'),
+            'returning_signature_name' => $request->input('returning_signature_name'),
+            'custodian' => Auth::user()->fullname
+        ];
+    }
+
+    private function decodeVehicleTripTicket($remarks)
+    {
+        $decoded = json_decode((string) $remarks, true);
+        if (json_last_error() === JSON_ERROR_NONE && isset($decoded['vehicle_trip_ticket'])) {
+            return $decoded['vehicle_trip_ticket'];
+        }
+
+        $fallback = [];
+        $keys = [
+            'name_of_driver',
+            'phone',
+            'destination',
+            'purpose',
+            'date_borrowed',
+            'time_of_departure',
+            'departure_mileage',
+            'division_1',
+            'division_2',
+            'division_3',
+            'passenger_1',
+            'passenger_2',
+            'passenger_3',
+            'trip_remarks',
+            'borrower_signature_name',
+            'returning_signature_name',
+            'supervising_officer',
+            'custodian'
+        ];
+
+        foreach ($keys as $key) {
+            if (preg_match('/"' . preg_quote($key, '/') . '":"([^"]*)"/', (string) $remarks, $matches)) {
+                $fallback[$key] = stripcslashes($matches[1]);
+            }
+        }
+
+        return $fallback;
+    }
+
+    private function getLatestBorrowedVehicleHistory($assetid, $beforeId = null)
+    {
+        $query = DB::table('asset_history')
+            ->where('assetid', $assetid)
+            ->where('status', '1');
+
+        if ($beforeId) {
+            $query->where('id', '<', $beforeId);
+        }
+
+        return $query->orderBy('id', 'desc')->first();
+    }
+
+    private function vehicleTripPdfResponse($history, $trip, $formTitle, $dateLabel, $dateValue, $timeLabel, $timeValue, $mileageLabel, $mileageValue, $filenamePrefix, $signatureLabel = 'Borrower Name over Signature')
+    {
+        if (!class_exists('\FPDF')) {
+            require_once app_path('fpdf/fpdf.php');
+        }
+
+        $getTrip = function ($key, $fallback = '') use ($trip) {
+            return isset($trip[$key]) && $trip[$key] !== null && $trip[$key] !== '' ? $trip[$key] : $fallback;
+        };
+
+        $date = $history->date ? date('Y-m-d', strtotime($history->date)) : date('Y-m-d');
+        $vehicleName = $history->assetname ?: ($history->vehiclecategory ?: 'Vehicle');
+        $custodian = $getTrip('custodian', $history->employeename ?: '');
+        $controlNo = isset($history->control_number) ? $history->control_number : '';
+
+        $text = function ($value) {
+            return utf8_decode((string) ($value ?? ''));
+        };
+
+        $pdf = new \FPDF('P', 'mm', 'Legal');
+        $pdf->AddPage();
+        $pdf->SetAutoPageBreak(false);
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY(0, 7);
+        $pdf->Cell(216, 4, 'Republic of the Philippines', 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, 'CITY GOVERNMENT OF MUNTINLUPA', 0, 1, 'C');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, 'City of Muntinlupa', 0, 0, 'C');
+
+        if (file_exists(public_path('muntilogo.png'))) {
+            $pdf->Image(public_path('muntilogo.png'), 17, 5, 25, 25);
+        }
+        if (file_exists(public_path('drlogo.png'))) {
+            $pdf->Image(public_path('drlogo.png'), 175, 5, 24, 24);
+        }
+
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetXY(0, 25);
+        $pdf->Cell(216, 4, 'DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT', 0, 1, 'C');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, '(Formerly Muntinlupa City Disaster Risk Reduction Management Office)', 0, 1, 'C');
+        $pdf->SetXY(0, 35);
+        $pdf->Cell(216, 4, 'Hall of Justice Compound, Resilience Building, Susana Heights, Tunasan, Muntinlupa City', 0, 1, 'C');
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, 'Tel No.: 8925-43-82', 0, 1, 'C');
+
+        $pdf->SetXY(12, 43.5);
+        $pdf->SetFillColor(33, 19, 13);
+        $pdf->Cell(192, 0.5, '', 1, 1, 'C', true);
+        $pdf->SetXY(12, 45);
+        $pdf->Cell(192, 0.2, '', 1, 1, 'C', true);
+
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->SetXY(10, 53);
+        $pdf->Cell(12, 5, 'DATE:', 0, 0, 'L');
+        $pdf->Cell(25, 4, $text($date), 'B', 0, 'C');
+        $pdf->SetXY(155, 47);
+        $pdf->Cell(12, 5, 'CGM-OP-MCDDRM-01F3', 0, 0, 'L');
+        $pdf->SetXY(155, 53);
+        $pdf->Cell(18, 5, 'Control #:', 0, 0, 'L');
+        $pdf->Cell(30, 4, $text($controlNo), 'B', 0, 'C');
+
+        $pdf->SetFont('Arial', 'B', 12);
+        $pdf->SetXY(0, 65);
+        $pdf->Cell(216, 4, $formTitle, 0, 1, 'C');
+
+        $pdf->SetFont('Arial', 'B', 11);
+        $pdf->SetXY(10, 80);
+        $pdf->SetFillColor(103, 190, 217);
+        $pdf->Cell(196, 8, 'VEHICLE TRIP TICKET.', 1, 1, 'C', true);
+
+        $drawBox = function ($x, $y, $w, $label, $value, $labelH = 5, $valueH = 15) use ($pdf, $text) {
+            $pdf->SetXY($x, $y);
+            $pdf->SetFont('Arial', 'B', 8.5);
+            $pdf->Cell($w, $labelH, $label, 'LTR', 1, 'L');
+            $pdf->SetX($x);
+            $pdf->SetFont('Arial', '', 8.5);
+            $pdf->Cell($w, $valueH, $text($value), 'LBR', 1, 'C');
+        };
+
+        $drawBox(10, 88.6, 65, 'Name of Driver:', $getTrip('name_of_driver'));
+        $drawBox(75.6, 88.6, 65, 'Destination(s):', $getTrip('destination'));
+        $drawBox(141.3, 88.6, 64.5, 'Vehicle Plate Number/ Conduction Sticker:', $history->assettag);
+        $drawBox(10, 109, 65, 'Phone #:', $getTrip('phone'), 5, 10);
+        $drawBox(75.6, 109, 65, 'Purpose(s):', $getTrip('purpose'), 5, 10);
+        $drawBox(141.3, 109, 64.4, 'Type of Vehicle:', $vehicleName, 5, 10);
+        $drawBox(10, 124.5, 65, $dateLabel, $dateValue, 5, 10);
+        $drawBox(75.6, 124.5, 65, $timeLabel, $timeValue, 5, 10);
+        $drawBox(141.3, 124.5, 64.4, $mileageLabel, $mileageValue, 5, 10);
+
+        $divisionItems = isset($trip['divisions']) && is_array($trip['divisions']) ? $trip['divisions'] : [];
+        $passengerItems = isset($trip['passengers']) && is_array($trip['passengers']) ? $trip['passengers'] : [];
+        if (!$divisionItems) {
+            foreach (range(1, 10) as $i) {
+                $value = $getTrip('division_' . $i);
+                if ($value !== '') {
+                    $divisionItems[] = $value;
+                }
+            }
+        }
+        if (!$passengerItems) {
+            foreach (range(1, 10) as $i) {
+                $value = $getTrip('passenger_' . $i);
+                if ($value !== '') {
+                    $passengerItems[] = $value;
+                }
+            }
+        }
+
+        $divisionItems = array_slice($divisionItems, 0, 10);
+        $passengerItems = array_slice($passengerItems, 0, 10);
+        $lineCount = max(3, count($divisionItems), count($passengerItems));
+        $detailHeight = max(16, ($lineCount * 5) + 1);
+        $detailBottomY = 145 + $detailHeight;
+        $notesY = $detailBottomY + 5;
+        $signY = $notesY + 24;
+        $custodianY = $signY + 15;
+
+        $pdf->Rect(9.6, 79.6, 196.6, $detailBottomY - 79.6);
+
+        $pdf->SetXY(10, 140);
+        $pdf->SetFont('Arial', 'B', 8.5);
+        $pdf->Cell(65, 5, 'Division:', 'LTR', 1, 'L');
+        $pdf->Cell(65, $detailHeight, '', 'LBR', 1, 'C');
+        $pdf->SetFont('Arial', '', 8.5);
+        foreach (range(1, $lineCount) as $i) {
+            $pdf->SetXY(10, 140 + ($i * 5));
+            $pdf->Cell(4, 5, (string) $i, 0, 0, 'L');
+            $pdf->Cell(58, 4, $text($divisionItems[$i - 1] ?? ''), 'B', 0, 'C');
+        }
+
+        $pdf->SetXY(75.5, 140);
+        $pdf->SetFont('Arial', 'B', 8.5);
+        $pdf->Cell(65, 5, 'Name of passenger:', 'LTR', 1, 'L');
+        $pdf->SetXY(75.5, 140);
+        $pdf->Cell(65, 5 + $detailHeight, '', 'LBR', 1, 'C');
+        $pdf->SetFont('Arial', '', 8.5);
+        foreach (range(1, $lineCount) as $i) {
+            $pdf->SetXY(75, 140 + ($i * 5));
+            $pdf->Cell(4, 5, (string) $i, 0, 0, 'L');
+            $pdf->Cell(58, 4, $text($passengerItems[$i - 1] ?? ''), 'B', 0, 'C');
+        }
+
+        $pdf->SetXY(141, 140);
+        $pdf->SetFont('Arial', 'B', 8.5);
+        $pdf->Cell(64.8, 5, 'Remarks:', 'LTR', 1, 'L');
+        $pdf->SetXY(143, 147);
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->MultiCell(60.8, 4, $text($getTrip('trip_remarks')), 0, 'L');
+        $pdf->SetXY(141, 140);
+        $pdf->Cell(64.8, 5 + $detailHeight, '', 'LBR', 1, 'C');
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY(0, $notesY);
+        $pdf->Cell(216, 4, '*If by accident, any damage is done to the vehicle, the borrower will be held liable for the damage and liabilities.', 0, 1, 'C');
+        $pdf->SetXY(0, $notesY + 5);
+        $pdf->Cell(216, 4, '*This trip ticket is applicable only during non-office hour, for non-emergency use and for all type of vehicles.', 0, 1, 'C');
+
+        $pdf->SetXY(20, 190);
+        $pdf->SetXY(20, $signY);
+        $pdf->Cell(70, 6, $text($getTrip('borrower_signature_name')), 0, 0, 'C');
+        $pdf->Cell(40, 6, '', 0, 0, 'C');
+        $pdf->Cell(70, 6, $text($getTrip('supervising_officer')), 0, 1, 'C');
+        $yLine = $pdf->GetY() - 1;
+        $pdf->Line(20, $yLine, 90, $yLine);
+        $pdf->Line(130, $yLine, 200, $yLine);
+        $pdf->SetX(20);
+        $pdf->Cell(70, 6, $signatureLabel, 0, 0, 'C');
+        $pdf->Cell(40, 6, '', 0, 0, 'C');
+        $pdf->Cell(70, 6, 'Supervising Officer', 0, 1, 'C');
+
+        $pdf->SetXY(20, $custodianY);
+        $pdf->Cell(40, 6, '', 0, 0, 'C');
+        $pdf->Cell(98, 6, $text($custodian), 0, 1, 'C');
+        $pdf->SetX(60);
+        $pdf->Cell(98, 6, 'Custodian', 0, 0, 'C');
+        $yLine = $pdf->GetY() - 1;
+        $pdf->Line(80, $yLine, 140, $yLine);
+
+        return response($pdf->Output('S'), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $filenamePrefix . '_' . $history->id . '.pdf"');
+    }
+
+    public function borrowedform($id)
+    {
+        if (!class_exists('\FPDF')) {
+            require_once app_path('fpdf/fpdf.php');
+        }
+
+        $history = DB::table('asset_history')
+            ->leftJoin('assets', 'asset_history.assetid', '=', 'assets.id')
+            ->leftJoin('employees', 'asset_history.employeeid', '=', 'employees.id')
+            ->leftJoin('department', 'employees.departmentid', '=', 'department.id')
+            ->leftJoin('users', 'users.id', '=', 'asset_history.created_by')
+            ->leftJoin('asset_type', 'asset_type.id', '=', 'assets.typeid')
+            ->select(
+                'asset_history.*',
+                'assets.name as assetname',
+                'assets.assettag',
+                'assets.vehiclecategory',
+                'assets.description',
+                'employees.fullname as employeename',
+                'employees.mobile_number as employeephone',
+                'department.name as departmentname',
+                'users.fullname as custodianname',
+                'asset_type.name as assettype'
+            )
+            ->where('asset_history.id', $id)
+            ->first();
+
+        if (!$history) {
+            abort(404);
+        }
+
+        $remarks = property_exists($history, 'remarks') ? $history->remarks : '';
+        $trip = $this->decodeVehicleTripTicket($remarks);
+        $date = $history->date ? date('Y-m-d', strtotime($history->date)) : date('Y-m-d');
+
+        return $this->vehicleTripPdfResponse(
+            $history,
+            $trip,
+            'Borrowed Form',
+            'Date Borrowed:',
+            $trip['date_borrowed'] ?? $date,
+            'Time of Departure:',
+            $trip['time_of_departure'] ?? '',
+            'Departure Millage:',
+            $trip['departure_mileage'] ?? '',
+            'vehicle_borrowed_form'
+        );
+
+        $getTrip = function ($key, $fallback = '') use ($trip) {
+            return isset($trip[$key]) && $trip[$key] !== null && $trip[$key] !== '' ? $trip[$key] : $fallback;
+        };
+
+        $date = $history->date ? date('Y-m-d', strtotime($history->date)) : date('Y-m-d');
+        $vehicleName = $history->assetname ?: ($history->vehiclecategory ?: 'Vehicle');
+        $custodian = $getTrip('custodian', $history->employeename ?: '');
+        $controlNo = isset($history->control_number) ? $history->control_number : '';
+
+        $text = function ($value) {
+            return utf8_decode((string) ($value ?? ''));
+        };
+
+        $pdf = new \FPDF('P', 'mm', 'Legal');
+        $pdf->AddPage();
+        $pdf->SetAutoPageBreak(false);
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY(0, 7);
+        $pdf->Cell(216, 4, 'Republic of the Philippines', 0, 1, 'C');
+
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, 'CITY GOVERNMENT OF MUNTINLUPA', 0, 1, 'C');
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, 'City of Muntinlupa', 0, 0, 'C');
+
+        if (file_exists(public_path('muntilogo.png'))) {
+            $pdf->Image(public_path('muntilogo.png'), 17, 5, 25, 25);
+        }
+        if (file_exists(public_path('drlogo.png'))) {
+            $pdf->Image(public_path('drlogo.png'), 175, 5, 24, 24);
+        }
+
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->SetXY(0, 25);
+        $pdf->Cell(216, 4, 'DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT', 0, 1, 'C');
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, '(Formerly Muntinlupa City Disaster Risk Reduction Management Office)', 0, 1, 'C');
+
+        $pdf->SetXY(0, 35);
+        $pdf->Cell(216, 4, 'Hall of Justice Compound, Resilience Building, Susana Heights, Tunasan, Muntinlupa City', 0, 1, 'C');
+
+        $pdf->SetX(0);
+        $pdf->Cell(216, 4, 'Tel No.: 8925-43-82', 0, 1, 'C');
+
+        $pdf->SetXY(12, 43.5);
+        $pdf->SetFillColor(33, 19, 13);
+        $pdf->Cell(192, 0.5, '', 1, 1, 'C', true);
+
+        $pdf->SetXY(12, 45);
+        $pdf->Cell(192, 0.2, '', 1, 1, 'C', true);
+
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->SetXY(10, 53);
+        $pdf->Cell(12, 5, 'DATE:', 0, 0, 'L');
+        $pdf->Cell(25, 4, $text($date), 'B', 0, 'C');
+
+        $pdf->SetXY(155, 47);
+        $pdf->Cell(12, 5, 'CGM-OP-MCDDRM-01F3', 0, 0, 'L');
+
+        $pdf->SetXY(155, 53);
+        $pdf->Cell(18, 5, 'Control #:', 0, 0, 'L');
+        $pdf->Cell(30, 4, $text($controlNo), 'B', 0, 'C');
+
+        $pdf->SetFont('Arial', 'B', 12);
+        $pdf->SetXY(0, 65);
+        $pdf->Cell(216, 4, 'Borrowed Form', 0, 1, 'C');
+
+        $pdf->SetFont('Arial', 'B', 11);
+        $pdf->SetXY(10, 80);
+        $pdf->SetFillColor(103, 190, 217);
+        $pdf->Cell(196, 8, 'VEHICLE TRIP TICKET.', 1, 1, 'C', true);
+        $pdf->SetXY(9.6, 79.6);
+        $pdf->Cell(196.6, 82, '', 1, 1);
+
+        $drawBox = function ($x, $y, $w, $label, $value, $labelH = 5, $valueH = 15) use ($pdf, $text) {
+            $pdf->SetXY($x, $y);
+            $pdf->SetFont('Arial', 'B', 8.5);
+            $pdf->Cell($w, $labelH, $label, 'LTR', 1, 'L');
+            $pdf->SetX($x);
+            $pdf->SetFont('Arial', '', 8.5);
+            $pdf->Cell($w, $valueH, $text($value), 'LBR', 1, 'C');
+        };
+
+        $drawBox(10, 88.6, 65, 'Name of Driver:', $getTrip('name_of_driver'));
+        $drawBox(75.6, 88.6, 65, 'Destination(s):', $getTrip('destination'));
+        $drawBox(141.3, 88.6, 64.5, 'Vehicle Plate Number/ Conduction Sticker:', $history->assettag);
+
+        $drawBox(10, 109, 65, 'Phone #:', $getTrip('phone'), 5, 10);
+        $drawBox(75.6, 109, 65, 'Purpose(s):', $getTrip('purpose'), 5, 10);
+        $drawBox(141.3, 109, 64.4, 'Type of Vehicle:', $vehicleName, 5, 10);
+
+        $drawBox(10, 124.5, 65, 'Date Borrowed:', $getTrip('date_borrowed', $date), 5, 10);
+        $drawBox(75.6, 124.5, 65, 'Time of Departure:', $getTrip('time_of_departure'), 5, 10);
+        $drawBox(141.3, 124.5, 64.4, 'Departure Millage:', $getTrip('departure_mileage'), 5, 10);
+
+        $pdf->SetXY(10, 140);
+        $pdf->SetFont('Arial', 'B', 8.5);
+        $pdf->Cell(65, 5, 'Division:', 'LTR', 1, 'L');
+        $pdf->Cell(65, 16, '', 'LBR', 1, 'C');
+        $pdf->SetFont('Arial', '', 8.5);
+        foreach ([1, 2, 3] as $i) {
+            $pdf->SetXY(10, 140 + ($i * 5));
+            $pdf->Cell(4, 5, (string) $i, 0, 0, 'L');
+            $pdf->Cell(58, 4, $text($getTrip('division_' . $i)), 'B', 0, 'C');
+        }
+
+        $pdf->SetXY(75.5, 140);
+        $pdf->SetFont('Arial', 'B', 8.5);
+        $pdf->Cell(65, 5, 'Name of passenger:', 'LTR', 1, 'L');
+        $pdf->SetXY(75.5, 140);
+        $pdf->Cell(65, 21, '', 'LBR', 1, 'C');
+        $pdf->SetFont('Arial', '', 8.5);
+        foreach ([1, 2, 3] as $i) {
+            $pdf->SetXY(75, 140 + ($i * 5));
+            $pdf->Cell(4, 5, (string) $i, 0, 0, 'L');
+            $pdf->Cell(58, 4, $text($getTrip('passenger_' . $i)), 'B', 0, 'C');
+        }
+
+        $pdf->SetXY(141, 140);
+        $pdf->SetFont('Arial', 'B', 8.5);
+        $pdf->Cell(64.8, 5, 'Remarks:', 'LTR', 1, 'L');
+        $pdf->SetXY(141, 145);
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->MultiCell(64.8, 5, $text($getTrip('trip_remarks')), 'LR', 'C');
+        $pdf->SetXY(141, 140);
+        $pdf->Cell(64.8, 21, '', 'LBR', 1, 'C');
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY(0, 166);
+        $pdf->Cell(216, 4, '*If by accident, any damage is done to the vehicle, the borrower will be held liable for the damage and liabilities.', 0, 1, 'C');
+        $pdf->SetXY(0, 171);
+        $pdf->Cell(216, 4, '*This trip ticket is applicable only during non-office hour, for non-emergency use and for all type of vehicles.', 0, 1, 'C');
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY(20, 190);
+        $pdf->Cell(70, 6, $text($getTrip('borrower_signature_name')), 0, 0, 'C');
+        $pdf->Cell(40, 6, '', 0, 0, 'C');
+        $pdf->Cell(70, 6, $text($getTrip('supervising_officer')), 0, 1, 'C');
+
+        $yLine = $pdf->GetY() - 1;
+        $pdf->Line(20, $yLine, 90, $yLine);
+        $pdf->Line(130, $yLine, 200, $yLine);
+
+        $pdf->SetX(20);
+        $pdf->Cell(70, 6, 'Borrower Name over Signature', 0, 0, 'C');
+        $pdf->Cell(40, 6, '', 0, 0, 'C');
+        $pdf->Cell(70, 6, 'Supervising Officer', 0, 1, 'C');
+
+        $pdf->SetXY(20, 205);
+        $pdf->Cell(40, 6, '', 0, 0, 'C');
+        $pdf->Cell(98, 6, $text($custodian), 0, 1, 'C');
+        $pdf->SetX(60);
+        $pdf->Cell(98, 6, 'Custodian', 0, 0, 'C');
+
+        $yLine = $pdf->GetY() - 1;
+        $pdf->Line(80, $yLine, 140, $yLine);
+
+        return response($pdf->Output('S'), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="vehicle_borrowed_form_' . $id . '.pdf"');
+    }
+
+    public function returnform($id)
+    {
+        $history = DB::table('asset_history')
+            ->leftJoin('assets', 'asset_history.assetid', '=', 'assets.id')
+            ->leftJoin('employees', 'asset_history.employeeid', '=', 'employees.id')
+            ->leftJoin('department', 'employees.departmentid', '=', 'department.id')
+            ->leftJoin('users', 'users.id', '=', 'asset_history.created_by')
+            ->leftJoin('asset_type', 'asset_type.id', '=', 'assets.typeid')
+            ->select(
+                'asset_history.*',
+                'assets.name as assetname',
+                'assets.assettag',
+                'assets.vehiclecategory',
+                'assets.description',
+                'employees.fullname as employeename',
+                'employees.mobile_number as employeephone',
+                'department.name as departmentname',
+                'users.fullname as custodianname',
+                'asset_type.name as assettype'
+            )
+            ->where('asset_history.id', $id)
+            ->first();
+
+        if (!$history) {
+            abort(404);
+        }
+
+        $returnPayload = json_decode((string) ($history->remarks ?? ''), true);
+        $returnTrip = [];
+        $savedBorrowedTrip = [];
+        if (json_last_error() === JSON_ERROR_NONE && isset($returnPayload['vehicle_return_ticket'])) {
+            $returnTrip = $returnPayload['vehicle_return_ticket'];
+            $savedBorrowedTrip = $returnPayload['vehicle_trip_ticket'] ?? [];
+        }
+
+        $borrowedHistory = $this->getLatestBorrowedVehicleHistory($history->assetid, $history->id);
+        $borrowedTrip = $borrowedHistory ? $this->decodeVehicleTripTicket($borrowedHistory->remarks ?? '') : [];
+
+        if ($borrowedHistory && !empty($borrowedHistory->control_number)) {
+            $history->control_number = $borrowedHistory->control_number;
+        }
+
+        $trip = array_merge($borrowedTrip, $savedBorrowedTrip, $returnTrip);
+        $trip['trip_remarks'] = $returnTrip['return_remarks'] ?? '';
+        $trip['borrower_signature_name'] = $returnTrip['returning_signature_name'] ?? '';
+        $date = $history->date ? date('Y-m-d', strtotime($history->date)) : date('Y-m-d');
+
+        return $this->vehicleTripPdfResponse(
+            $history,
+            $trip,
+            'Return Form',
+            'Date Return:',
+            $returnTrip['date_return'] ?? $date,
+            'Time of Arrival:',
+            $returnTrip['time_of_arrival'] ?? '',
+            'Arrival Millage:',
+            $returnTrip['arrival_mileage'] ?? '',
+            'vehicle_return_form',
+            'Returning Name over Signature'
+        );
+    }
+
 
     /**
      * get data from database
@@ -291,7 +878,7 @@ class AssetVehicle extends Controller
         } else {
             $res['success'] = 'failed';
         }
-        return response($res);
+        return response()->json($res);
     }
 
     /**
@@ -312,7 +899,7 @@ class AssetVehicle extends Controller
         } else {
             $res['success'] = 'failed';
         }
-        return response($res);
+        return response()->json($res);
     }
 
 
@@ -442,7 +1029,7 @@ class AssetVehicle extends Controller
                 $res['message'] = 'failed';
             }
         }
-        return response($res);
+        return response()->json($res);
     }
 
     /**
@@ -579,7 +1166,7 @@ class AssetVehicle extends Controller
                 $res['message'] = 'failed';
             }
         }
-        return response($res);
+        return response()->json($res);
     }
 
     /**
@@ -598,6 +1185,8 @@ class AssetVehicle extends Controller
         $date           = $request->input('checkoutdate');
         $vehiclestatus  = $request->input('vehiclestatus');
         $remarks        = $request->input('remarks');
+        $controlno      = $request->input('controlno') ?: $this->generateVehicleTripControlNumber();
+        $tripTicket     = $this->vehicleTripTicketData($request);
         $status         = '1';
         if ($vehiclestatus === 'returned') {
             $status = '2';
@@ -610,10 +1199,30 @@ class AssetVehicle extends Controller
         $receiverby     = Auth::id();
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
-        $data           = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'created_by' => $receiverby, 'created_at' => $created_at, 'updated_at' => $updated_at);
-        $insert         = DB::table('asset_history')->insert($data);
+        $historyRemarks = $remarks;
 
-        if ($insert) {
+        if ($vehiclestatus === 'borrowed') {
+            $historyRemarks = json_encode([
+                'vehicle_trip_ticket' => $tripTicket,
+                'remarks' => $request->input('trip_remarks')
+            ]);
+        }
+
+        $data = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'created_at' => $created_at, 'updated_at' => $updated_at);
+
+        if ($this->assetHistoryHasColumn('created_by')) {
+            $data['created_by'] = $receiverby;
+        }
+        if ($this->assetHistoryHasColumn('control_number')) {
+            $data['control_number'] = $controlno;
+        }
+        if ($this->assetHistoryHasColumn('remarks')) {
+            $data['remarks'] = $historyRemarks;
+        }
+
+        $insertId = DB::table('asset_history')->insertGetId($data);
+
+        if ($insertId) {
             $assetUpdate = [
                 'checkstatus'         => $checkstatus,
                 'status'              => ($vehiclestatus === 'unserviceable') ? '6' : '1',
@@ -631,11 +1240,13 @@ class AssetVehicle extends Controller
             }
 
             $res['success'] = 'success';
+            $res['id'] = $insertId;
+            $res['print_url'] = ($vehiclestatus === 'borrowed') ? url('assetvehiclelist/borrowedform/' . $insertId) : null;
         } else {
             $res['success'] = 'failed';
         }
 
-        return response($res);
+        return response()->json($res);
     }
 
     /**
@@ -654,6 +1265,7 @@ class AssetVehicle extends Controller
         $date           = $request->input('checkindate');
         $vehiclestatus  = $request->input('vehiclestatus');
         $remarks        = $request->input('remarks');
+        $returnTrip     = $this->vehicleReturnTripTicketData($request);
         $status         = '2';
         if ($vehiclestatus === 'borrowed') {
             $status = '1';
@@ -666,10 +1278,34 @@ class AssetVehicle extends Controller
         $receiverby     = Auth::id();
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
-        $data           = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'created_by' => $receiverby, 'created_at' => $created_at, 'updated_at' => $updated_at);
-        $insert         = DB::table('asset_history')->insert($data);
+        $borrowedHistory = $this->getLatestBorrowedVehicleHistory($assetid);
+        $controlno = ($borrowedHistory && !empty($borrowedHistory->control_number)) ? $borrowedHistory->control_number : $this->generateVehicleTripControlNumber();
+        $borrowedTrip = $borrowedHistory ? $this->decodeVehicleTripTicket($borrowedHistory->remarks ?? '') : [];
+        $historyRemarks = $remarks;
 
-        if ($insert) {
+        if ($vehiclestatus === 'returned') {
+            $historyRemarks = json_encode([
+                'vehicle_return_ticket' => $returnTrip,
+                'vehicle_trip_ticket' => $borrowedTrip,
+                'remarks' => $request->input('return_remarks')
+            ]);
+        }
+
+        $data = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'created_at' => $created_at, 'updated_at' => $updated_at);
+
+        if ($this->assetHistoryHasColumn('created_by')) {
+            $data['created_by'] = $receiverby;
+        }
+        if ($this->assetHistoryHasColumn('control_number')) {
+            $data['control_number'] = $controlno;
+        }
+        if ($this->assetHistoryHasColumn('remarks')) {
+            $data['remarks'] = $historyRemarks;
+        }
+
+        $insertId = DB::table('asset_history')->insertGetId($data);
+
+        if ($insertId) {
             $assetUpdate = [
                 'checkstatus'         => $checkstatus,
                 'status'              => ($vehiclestatus === 'unserviceable') ? '6' : '1',
@@ -686,11 +1322,13 @@ class AssetVehicle extends Controller
                 $this->closeUnserviceableMaintenance($assetid, $date, $updated_at);
             }
             $res['success'] = 'success';
+            $res['id'] = $insertId;
+            $res['print_url'] = ($vehiclestatus === 'returned') ? url('assetvehiclelist/returnform/' . $insertId) : null;
         } else {
             $res['success'] = 'failed';
         }
 
-        return response($res);
+        return response()->json($res);
     }
 
     /**

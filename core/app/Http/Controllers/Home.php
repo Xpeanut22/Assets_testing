@@ -15,6 +15,28 @@ class Home extends Controller
 {
    use TraitSettings;
 
+    private function vehicleActivityName($remarks, $fallback = '-')
+    {
+        $payload = json_decode((string) $remarks, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($payload)) {
+            return $fallback ?: '-';
+        }
+
+        $trip = [];
+        if (isset($payload['vehicle_trip_ticket']) && is_array($payload['vehicle_trip_ticket'])) {
+            $trip = $payload['vehicle_trip_ticket'];
+        } elseif (isset($payload['borrower_signature_name'])) {
+            $trip = $payload;
+        }
+
+        $name = $trip['borrower_signature_name'] ?? null;
+        if (!$name && isset($payload['vehicle_return_ticket']['returning_signature_name'])) {
+            $name = $payload['vehicle_return_ticket']['returning_signature_name'];
+        }
+
+        return trim((string) $name) !== '' ? $name : ($fallback ?: '-');
+    }
+
     public function __construct() {
 		
 		$data = $this->getapplications();
@@ -107,12 +129,23 @@ class Home extends Controller
 		->orderBy('asset_history.created_at', 'desc')
 		->get();
 
+        $data->transform(function ($row) {
+            $row->employees = $this->vehicleActivityName($row->remarks ?? '', $row->employees ?? '-');
+            return $row;
+        });
+
         return Datatables::of($data)
         
         ->addColumn( 'status', function ( $accountsingle ) {
            
 
-            if($accountsingle->status==2){
+            if($accountsingle->status==4){
+                    $status = '<span class="badge badge-data text-white background-red">'.trans('lang.unserviceable').'</span>';
+
+            } elseif($accountsingle->status==3){
+                    $status = '<span class="badge badge-data text-white background-green">'.trans('lang.serviceable').'</span>';
+
+            } elseif($accountsingle->status==2){
                     
                     $status = '<span class="badge badge-data text-white background-blue">'.trans('lang.checkin').'</span>';
                 
@@ -164,4 +197,3 @@ class Home extends Controller
         ->make(true);		
     }
 }
-

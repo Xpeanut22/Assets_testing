@@ -16,6 +16,28 @@ class Reports extends Controller
 
 	use TraitSettings;
 
+    private function vehicleActivityBorrowerName($remarks, $fallback = '-')
+    {
+        $payload = json_decode((string) $remarks, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($payload)) {
+            return $fallback ?: '-';
+        }
+
+        $trip = [];
+        if (isset($payload['vehicle_trip_ticket']) && is_array($payload['vehicle_trip_ticket'])) {
+            $trip = $payload['vehicle_trip_ticket'];
+        } elseif (isset($payload['borrower_signature_name'])) {
+            $trip = $payload;
+        }
+
+        $borrower = $trip['borrower_signature_name'] ?? null;
+        if (!$borrower && isset($payload['vehicle_return_ticket']['returning_signature_name'])) {
+            $borrower = $payload['vehicle_return_ticket']['returning_signature_name'];
+        }
+
+        return trim((string) $borrower) !== '' ? $borrower : ($fallback ?: '-');
+    }
+
 	public function __construct() {
 		$data = $this->getapplications();
 		$lang = $data->language;
@@ -73,6 +95,11 @@ class Reports extends Controller
 		->orderBy('asset_history.updated_at', 'desc')
 		->orderBy('asset_history.created_at', 'desc')
 		->get();
+
+        $data->transform(function ($row) {
+            $row->employees = $this->vehicleActivityBorrowerName($row->remarks ?? '', $row->employees ?? '-');
+            return $row;
+        });
 
         return Datatables::of($data)
         ->addColumn( 'historystatus', function ( $accountsingle ) {
