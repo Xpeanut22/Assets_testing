@@ -228,6 +228,42 @@ class AssetVehicle extends Controller
         return $fallback;
     }
 
+    private function vehicleHistoryRemarks($remarks)
+    {
+        $decoded = json_decode((string) $remarks, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            return $remarks ?: '';
+        }
+
+        if (isset($decoded['vehicle_return_ticket']) && is_array($decoded['vehicle_return_ticket'])) {
+            return $decoded['vehicle_return_ticket']['return_remarks'] ?? ($decoded['remarks'] ?? '');
+        }
+
+        if (isset($decoded['vehicle_trip_ticket']) && is_array($decoded['vehicle_trip_ticket'])) {
+            return $decoded['vehicle_trip_ticket']['trip_remarks'] ?? ($decoded['remarks'] ?? '');
+        }
+
+        return $decoded['trip_remarks'] ?? $decoded['return_remarks'] ?? $decoded['remarks'] ?? '';
+    }
+
+    private function vehicleHistoryName($remarks, $fallback = '-')
+    {
+        $decoded = json_decode((string) $remarks, true);
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            return $fallback ?: '-';
+        }
+
+        if (isset($decoded['vehicle_return_ticket']['returning_signature_name'])) {
+            $name = $decoded['vehicle_return_ticket']['returning_signature_name'];
+        } elseif (isset($decoded['vehicle_trip_ticket']['borrower_signature_name'])) {
+            $name = $decoded['vehicle_trip_ticket']['borrower_signature_name'];
+        } else {
+            $name = $decoded['returning_signature_name'] ?? $decoded['borrower_signature_name'] ?? null;
+        }
+
+        return trim((string) $name) !== '' ? $name : ($fallback ?: '-');
+    }
+
     private function getLatestBorrowedVehicleHistory($assetid, $beforeId = null)
     {
         $query = DB::table('asset_history')
@@ -468,7 +504,7 @@ class AssetVehicle extends Controller
         return $this->vehicleTripPdfResponse(
             $history,
             $trip,
-            'Borrowed Form',
+            'Assets Vehicle Borrowed Form',
             'Date Borrowed:',
             $trip['date_borrowed'] ?? $date,
             'Time of Departure:',
@@ -696,7 +732,7 @@ class AssetVehicle extends Controller
         return $this->vehicleTripPdfResponse(
             $history,
             $trip,
-            'Return Form',
+            'Assets Vehicle Return Form',
             'Date Return:',
             $returnTrip['date_return'] ?? $date,
             'Time of Arrival:',
@@ -779,12 +815,16 @@ class AssetVehicle extends Controller
     {
         $id            = $request->input('assetid');
 
-        $data = DB::select("select asset_history.*, assets.name as assetname,  IFNULL(employees.fullname, '-') as employeename
+        $data = DB::select("select asset_history.*, assets.name as assetname, IFNULL(employees.fullname, '-') as employeename, department.name as office, COALESCE(NULLIF(users.fullname, ''), '-') as fullname
 
         from asset_history left join assets  
         on asset_history.assetid = assets.id
         left join employees 
         on asset_history.employeeid = employees.id
+        left join department
+        on employees.departmentid = department.id
+        left join users
+        on users.id = asset_history.created_by
         where asset_history.assetid = '$id'
         order by asset_history.created_at desc");
         return Datatables::of($data)
@@ -809,6 +849,12 @@ class AssetVehicle extends Controller
 
                 $setting = DB::table('settings')->where('id', '1')->first();
                 return date($setting->formatdate, strtotime($single->date));
+            })
+            ->editColumn('remarks', function ($single) {
+                return $this->vehicleHistoryRemarks($single->remarks ?? '');
+            })
+            ->editColumn('employeename', function ($single) {
+                return $this->vehicleHistoryName($single->remarks ?? '', $single->employeename ?? '-');
             })
             ->rawColumns(['status', 'date'])
             ->make(true);

@@ -8,9 +8,9 @@
                 <h3 class=""><?php echo trans('lang.assetdetail');?></h3>
             </div>
             <div class="col-md-4 text-md-right">
-                                  <a target="_blank" href="{{url('assetlist/generatelabel', $id)}}" id="btndetail" class="btn btn-sm btn-fill btn-primary"><i
+                                  <a target="_blank" href="{{url('assetvehiclelist/generatelabel', $id)}}" id="btndetail" class="btn btn-sm btn-fill btn-primary"><i
                                         class="ti-info"></i> <?php echo trans('lang.generatelabel');?></a>
-                                <a href="{{ url('assetlist') }}" id="btndetail"  class="btn btn-sm btn-fill btn-warning"><i
+                                <a href="{{ url('assetvehiclelist') }}" id="btndetail"  class="btn btn-sm btn-fill btn-warning"><i
                                         class="ti-info"></i> <?php echo trans('lang.backtoasset');?></a>
                            
             </div>
@@ -274,19 +274,23 @@
                                                 <thead>
                                                     <tr>
                                                         <th>ID</th>
-                                                        <th><?php echo trans('lang.date');?></th>
-                                                        <th><?php echo trans('lang.assetname');?></th>
-                                                        <th><?php echo trans('lang.employee');?></th>
-                                                        <th><?php echo trans('lang.action');?></th>
+                                                        <th>Action</th>
+                                                        <th>Date and Time</th>
+                                                        <th>Name</th>
+                                                        <th>Office</th>
+                                                        <th>Logistic Custodian</th>
+                                                        <th>Remarks</th>
                                                     </tr>
                                                 </thead>
                                                 <tfoot>
                                                     <tr>
                                                         <th>ID</th>
-                                                        <th><?php echo trans('lang.date');?></th>
-                                                        <th><?php echo trans('lang.assetname');?></th>
-                                                        <th><?php echo trans('lang.employee');?></th>
-                                                        <th><?php echo trans('lang.action');?></th>
+                                                        <th>Action</th>
+                                                        <th>Date and Time</th>
+                                                        <th>Name</th>
+                                                        <th>Office</th>
+                                                        <th>Logistic Custodian</th>
+                                                        <th>Remarks</th>
                                                     </tr>
                                                 </tfoot>
                                                 <tbody>
@@ -686,22 +690,26 @@
                 searchable: false,
                 visible: false
             },
-            
+            {
+                data: 'status'
+            },
             {
                 data: 'date'
-            },
-           
-            {
-                data: 'assetname'
             },
             {
                 data: 'employeename'
             },
             {
-                data: 'status'
+                data: 'office',
+                defaultContent: '-'
             },
-            
-           
+            {
+                data: 'fullname',
+                defaultContent: '-'
+            },
+            {
+                data: 'remarks'
+            },
         ],
        
         buttons: [{
@@ -710,7 +718,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.history_list ');?>',
                 exportOptions: {
-                    columns: [1, 2, 3, 4 ]
+                    columns: [1, 2, 3, 4, 5, 6]
                 }
             },
             {
@@ -719,7 +727,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.history_list');?>',
                 exportOptions: {
-                    columns: [1, 2, 3, 4]
+                    columns: [1, 2, 3, 4, 5, 6]
                 }
             },
             {
@@ -729,7 +737,7 @@
                 title: '<?php echo trans('lang.history_list');?>',
                 orientation: 'landscape',
                 exportOptions: {
-                    columns: [1, 2, 3, 4]
+                    columns: [1, 2, 3, 4, 5, 6]
                 },
                 customize: function(doc) {
                     doc.styles.tableHeader.alignment = 'left';
@@ -743,7 +751,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
                 exportOptions: {
-                    columns: [1, 2, 3, 4 ]
+                    columns: [1, 2, 3, 4, 5, 6]
                 }
             }
         ]
