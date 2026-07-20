@@ -607,22 +607,22 @@
                                 </div>
                                 <div class="form-group col-md-4">
                                     <label>Name of Driver</label>
-                                    <input name="name_of_driver" type="text" id="checkoutdriver" class="form-control" placeholder="Name of Driver" />
+                                    <input name="name_of_driver" type="text" id="checkoutdriver" class="form-control" required placeholder="Name of Driver" />
                                 </div>
                                 <div class="form-group col-md-4">
                                     <label>Phone #</label>
-                                    <input name="phone" type="text" id="checkoutphone" class="form-control number-only" inputmode="numeric" placeholder="Phone #" />
+                                    <input name="phone" type="text" id="checkoutphone" class="form-control number-only" inputmode="numeric" required placeholder="Phone #" />
                                 </div>
                             </div>
 
                             <div class="form-row">
                                 <div class="form-group col-md-6">
                                     <label>Destination(s)</label>
-                                    <input name="destination" type="text" id="checkoutdestination" class="form-control" placeholder="Destination(s)" />
+                                    <input name="destination" type="text" id="checkoutdestination" class="form-control" required placeholder="Destination(s)" />
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label>Purpose(s)</label>
-                                    <input name="purpose" type="text" id="checkoutpurpose" class="form-control" placeholder="Purpose(s)" />
+                                    <input name="purpose" type="text" id="checkoutpurpose" class="form-control" required placeholder="Purpose(s)" />
                                 </div>
                             </div>
 
@@ -637,7 +637,7 @@
                                 </div>
                                 <div class="form-group col-md-4">
                                     <label>Departure Mileage</label>
-                                    <input name="departure_mileage" type="text" id="checkoutmileage" class="form-control number-only" inputmode="numeric" placeholder="Departure Mileage" />
+                                    <input name="departure_mileage" type="text" id="checkoutmileage" class="form-control number-only" inputmode="numeric" required placeholder="Departure Mileage" />
                                 </div>
                             </div>
 
@@ -675,11 +675,11 @@
                             <div class="form-row">
                                 <div class="form-group col-md-6">
                                     <label>Borrower Name</label>
-                                    <input name="borrower_signature_name" type="text" id="checkoutsignature" class="form-control" placeholder="Borrower Name" />
+                                    <input name="borrower_signature_name" type="text" id="checkoutsignature" class="form-control" required placeholder="Borrower Name" />
                                 </div>
                                 <div class="form-group col-md-6">
                                     <label>Supervising Officer</label>
-                                    <input name="supervising_officer" type="text" id="checkoutsupervising" class="form-control" placeholder="Supervising Officer" />
+                                    <input name="supervising_officer" type="text" id="checkoutsupervising" class="form-control" required placeholder="Supervising Officer" />
                                 </div>
                             </div>
 
@@ -782,11 +782,11 @@
                             <div class="form-row">
                                 <div class="form-group col-md-4">
                                     <label>Returning Name</label>
-                                    <input name="returning_signature_name" type="text" id="checkinreturningname" class="form-control" placeholder="Returning Name" />
+                                    <input name="returning_signature_name" type="text" id="checkinreturningname" class="form-control" required placeholder="Returning Name" />
                                 </div>
                                 <div class="form-group col-md-4">
                                     <label>Arrival Mileage</label>
-                                    <input name="arrival_mileage" type="text" id="checkinmileage" class="form-control number-only" inputmode="numeric" placeholder="Arrival Mileage" />
+                                    <input name="arrival_mileage" type="text" id="checkinmileage" class="form-control number-only" inputmode="numeric" required placeholder="Arrival Mileage" />
                                 </div>
                             </div>
 

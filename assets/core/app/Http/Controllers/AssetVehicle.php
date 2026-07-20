@@ -351,7 +351,7 @@ class AssetVehicle extends Controller
         $pdf->SetFont('Arial', 'B', 11);
         $pdf->SetXY(10, 80);
         $pdf->SetFillColor(103, 190, 217);
-        $pdf->Cell(196, 8, 'VEHICLE TRIP TICKET.', 1, 1, 'C', true);
+        $pdf->Cell(196, 8, 'VEHICLE TRIP TICKET', 1, 1, 'C', true);
 
         $drawBox = function ($x, $y, $w, $label, $value, $labelH = 5, $valueH = 15) use ($pdf, $text) {
             $pdf->SetXY($x, $y);
@@ -590,7 +590,7 @@ class AssetVehicle extends Controller
         $pdf->SetFont('Arial', 'B', 11);
         $pdf->SetXY(10, 80);
         $pdf->SetFillColor(103, 190, 217);
-        $pdf->Cell(196, 8, 'VEHICLE TRIP TICKET.', 1, 1, 'C', true);
+        $pdf->Cell(196, 8, 'VEHICLE TRIP TICKET', 1, 1, 'C', true);
         $pdf->SetXY(9.6, 79.6);
         $pdf->Cell(196.6, 82, '', 1, 1);
 
