@@ -581,7 +581,7 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group col-md-12">
-                                <label id="borrowername">Custodian Name</label>
+                                <label id="borrowername">Logistic Custodian</label>
                                 <input type="text" class="form-control" readonly value="{{ Auth::user()->fullname }}" />
                                 <input type="hidden" name="employeeid" id="checkoutemployeeid" value="0" />
                             </div>
@@ -745,7 +745,7 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group col-md-12">
-                                <label id="returnname">Custodian Name</label>
+                                <label id="returnname">Logistic Custodian</label>
                                 <input type="text" class="form-control" readonly value="{{ Auth::user()->fullname }}" />
                                 <input type="hidden" name="employeeid1" id="checkoutemployeeid1" value="0" />
                             </div>

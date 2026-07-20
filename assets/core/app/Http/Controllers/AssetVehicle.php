@@ -457,7 +457,7 @@ class AssetVehicle extends Controller
         $pdf->Cell(40, 6, '', 0, 0, 'C');
         $pdf->Cell(98, 6, $text($custodian), 0, 1, 'C');
         $pdf->SetX(60);
-        $pdf->Cell(98, 6, 'Custodian', 0, 0, 'C');
+        $pdf->Cell(98, 6, 'Logistic Custodian', 0, 0, 'C');
         $yLine = $pdf->GetY() - 1;
         $pdf->Line(80, $yLine, 140, $yLine);
 
@@ -672,7 +672,7 @@ class AssetVehicle extends Controller
         $pdf->Cell(40, 6, '', 0, 0, 'C');
         $pdf->Cell(98, 6, $text($custodian), 0, 1, 'C');
         $pdf->SetX(60);
-        $pdf->Cell(98, 6, 'Custodian', 0, 0, 'C');
+        $pdf->Cell(98, 6, 'Logistic Custodian', 0, 0, 'C');
 
         $yLine = $pdf->GetY() - 1;
         $pdf->Line(80, $yLine, 140, $yLine);
