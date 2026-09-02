@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\DepartmentModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -15,6 +16,7 @@ use Auth;
 class Typeofid extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct() {
 		
@@ -100,7 +102,7 @@ class Typeofid extends Controller
 
 		if ( $insert ) {
 			$res['success'] = 'success';
-			
+			$this->auditTrail('Utilities', 'Create', 'Created type of ID: '.$name.'.', 'Type of ID', null, null, ['name' => $name, 'description' => $description]);
         } else{
             $res['success'] = 'failed';
         }
@@ -119,8 +121,9 @@ class Typeofid extends Controller
         $id             = $request->input( 'id' );
         $name           = $request->input( 'name' );
         $description    = $request->input( 'description' );
-        $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
+
+        $oldTypeofid = DB::table('typeofid')->where('id', $id)->where('is_delete', 0)->first();
 
 		$update = DB::table( 'typeofid' )->where( 'id', $id )->where('is_delete', 0)
 		->update(
@@ -133,7 +136,9 @@ class Typeofid extends Controller
         
         if ( $update ) {
 			$res['success'] = 'success';
-			
+			$diff = $this->auditCalculateDiff($oldTypeofid, ['name' => $name, 'description' => $description], ['name' => 'Name', 'description' => 'Description']);
+			$detailsText = 'Updated type of ID: '.$name.($diff['details'] ? ":\n" . $diff['details'] : '');
+			$this->auditTrail('Utilities', 'Update', $detailsText, 'Type of ID', $id, $diff['old'], $diff['new']);
         } else{
             $res['success'] = 'failed';
         }
@@ -150,9 +155,11 @@ class Typeofid extends Controller
 
 	public function delete( Request $request ) {
 		$id = $request->input( 'id' );
+		$typeofid = DB::table('typeofid')->where('id', $id)->where('is_delete', 0)->first();
 		$delete = DB::table( 'typeofid' )->where( 'id', $id )->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
             if ( $delete ) {
                 $res['success'] = 'success';
+                $this->auditTrail('Utilities', 'Delete', 'Deleted type of ID ID: '.$id.'.', 'Type of ID', $id, ['name' => $typeofid->name ?? '-', 'description' => $typeofid->description ?? '-'], null);
             } else{
                 $res['success'] = 'failed';
             }

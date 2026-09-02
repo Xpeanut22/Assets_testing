@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 
 //Class needed for login and Logout logic
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use App\Http\Controllers\TraitAuditTrail;
 
 //Auth facade
 use Auth;
@@ -28,6 +29,7 @@ class LoginController extends Controller
     */
 
     use AuthenticatesUsers;
+    use TraitAuditTrail;
 
     /**
      * Where to redirect users after login.
@@ -47,6 +49,7 @@ class LoginController extends Controller
     }
 
     public function logout() {
+        $this->auditTrail('Authentication', 'Logout', 'User logged out successfully.', 'Authentication', null, null, null);
         Auth::logout();
         return redirect('/login');
       }
@@ -73,6 +76,7 @@ class LoginController extends Controller
         $user = Auth::attempt(['email' => $email, 'password' => $password, 'status' => '1']);
         if($user) {
 
+                $this->auditTrail('Authentication', 'Login', 'User logged in successfully.', 'Authentication', Auth::id(), null, null);
                 $res['success'] = 'success';
                 return response($res);
         } else {

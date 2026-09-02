@@ -109,31 +109,25 @@
                 }
             },
             {
-                extend: 'pdf',
                 text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                 className: 'btn btn-sm btn-fill btn-info ',
-                title: '<?php echo trans('lang.maintenancereport');?>',
-                orientation: 'landscape',
-                exportOptions: {
-                    columns: [1, 2, 3, 4, 5,6, 7]
-                },
-                customize: function(doc) {
-                    doc.styles.tableHeader.alignment = 'left';
-                    doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                        .join('*').split('');
+                action: function() {
+                    openMaintenancePdf();
                 }
             },
             {
-                extend: 'print',
-                title: '<?php echo trans('lang.maintenancereport');?>',
-                className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
-                exportOptions: {
-                    columns: [1, 2, 3, 4, 5,6, 7]
+                className: 'btn btn-sm btn-fill btn-info ',
+                action: function() {
+                    openMaintenancePdf();
                 }
             }
         ]
     });
+
+    function openMaintenancePdf() {
+        window.open("{{ url('/reports/maintenance/print/maintenance-report') }}", '_blank');
+    }
 
 })(jQuery);
 </script>

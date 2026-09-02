@@ -895,15 +895,57 @@ class Inventory extends Controller
 
     public function exportexcel(Request $request)
     {
-        $from = $request->input('datefrom');
-        $to = $request->input('dateto');
-        $fromDate = str_replace('T', ' ', $from);
-        $toDate = str_replace('T', ' ', $to);
+        $from = $request->input('datefrom_display') ?: $request->input('datefrom');
+        $to = $request->input('dateto_display') ?: $request->input('dateto');
+        $parseInventoryDate = function ($value, $endOfDay = false) {
+            $dateOnly = trim(explode(',', (string) $value)[0]);
+            $date = \DateTime::createFromFormat('Y-m-d\TH:i', (string) $value)
+                ?: \DateTime::createFromFormat('Y-m-d\TH:i:s', (string) $value)
+                ?: \DateTime::createFromFormat('Y-m-d H:i:s', str_replace('T', ' ', (string) $value))
+                ?: \DateTime::createFromFormat('Y-m-d H:i', str_replace('T', ' ', (string) $value))
+                ?: \DateTime::createFromFormat('m/d/Y', $dateOnly);
+
+            if (!$date) {
+                $date = new \DateTime(str_replace('T', ' ', (string) $value));
+            }
+
+            $date->setTime($endOfDay ? 23 : 0, $endOfDay ? 59 : 0, $endOfDay ? 59 : 0);
+
+            return $date;
+        };
+        $displayInventoryDate = function ($value) {
+            $dateOnly = trim(explode(',', (string) $value)[0]);
+            $date = \DateTime::createFromFormat('Y-m-d\TH:i', (string) $value)
+                ?: \DateTime::createFromFormat('Y-m-d\TH:i:s', (string) $value)
+                ?: \DateTime::createFromFormat('Y-m-d H:i:s', str_replace('T', ' ', (string) $value))
+                ?: \DateTime::createFromFormat('Y-m-d H:i', str_replace('T', ' ', (string) $value))
+                ?: \DateTime::createFromFormat('m/d/Y', $dateOnly);
+
+            if ($date) {
+                return $date->format('m/d/Y');
+            }
+
+            return $dateOnly !== '' ? $dateOnly : trim((string) $value);
+        };
+
+        $fromDateObject = $parseInventoryDate($from);
+        $toDateObject = $parseInventoryDate($to, true);
+        $fromDate = $fromDateObject->format('Y-m-d H:i:s');
+        $toDate = $toDateObject->format('Y-m-d H:i:s');
 
         $masterItems = DB::table(DB::raw("(
                 SELECT assets.name as item_name,
                     SUM(CAST(assets.quantity AS DECIMAL(20,2))) as allQuantity,
-                    MAX(assets_units.unit) as unit
+                    MAX(assets_units.unit) as unit,
+                    CASE
+                        WHEN MAX(assets.status) = 1 THEN '" . trans('lang.readytodeploy') . "'
+                        WHEN MAX(assets.status) = 2 THEN '" . trans('lang.pending') . "'
+                        WHEN MAX(assets.status) = 3 THEN '" . trans('lang.archived') . "'
+                        WHEN MAX(assets.status) = 4 THEN '" . trans('lang.broken') . "'
+                        WHEN MAX(assets.status) = 5 THEN '" . trans('lang.lost') . "'
+                        WHEN MAX(assets.status) = 6 THEN '" . trans('lang.outofrepair') . "'
+                        ELSE '-'
+                    END as status_label
                 FROM assets
                 LEFT JOIN units as assets_units ON assets_units.id = assets.unit
                 WHERE assets.typeid != 7
@@ -911,7 +953,12 @@ class Inventory extends Controller
                 UNION ALL
                 SELECT component.name as item_name,
                     SUM(CAST(component.quantity AS DECIMAL(20,2))) as allQuantity,
-                    MAX(component_units.unit) as unit
+                    MAX(component_units.unit) as unit,
+                    CASE
+                        WHEN MAX(component.checkstatus) = 0 THEN 'Available'
+                        WHEN MAX(component.checkstatus) = 2 THEN 'Issued'
+                        ELSE '-'
+                    END as status_label
                 FROM component
                 LEFT JOIN units as component_units ON component_units.id = component.unit
                 GROUP BY component.name
@@ -919,7 +966,8 @@ class Inventory extends Controller
             ->select(
                 'item_name',
                 DB::raw('SUM(allQuantity) as allQuantity'),
-                DB::raw("COALESCE(MAX(unit), '') as unit")
+                DB::raw("COALESCE(MAX(unit), '') as unit"),
+                DB::raw("COALESCE(MAX(status_label), '-') as status_label")
             )
             ->whereNotNull('item_name')
             ->groupBy('item_name')
@@ -945,246 +993,84 @@ class Inventory extends Controller
                 'receiver.fullname',
                 'asset_type.description',
                 DB::raw('COALESCE(assets.quantity, component.quantity) as allQuantity'),
-                DB::raw('COALESCE(assets_units.unit, component_units.unit) as unit')
+                DB::raw('COALESCE(assets_units.unit, component_units.unit) as unit'),
+                'assets.status as asset_status',
+                'component.checkstatus as component_checkstatus'
             )
-            ->groupBy(DB::raw('COALESCE(component.name, assets.name, inventory.equipment_name, inventory.item)'), 'inventory.created_at', 'receiver.fullname', 'asset_type.description', 'inventory.item', 'assets.quantity', 'component.quantity', 'assets_units.unit', 'component_units.unit')
+            ->groupBy(DB::raw('COALESCE(component.name, assets.name, inventory.equipment_name, inventory.item)'), 'inventory.created_at', 'receiver.fullname', 'asset_type.description', 'inventory.item', 'assets.quantity', 'component.quantity', 'assets_units.unit', 'component_units.unit', 'assets.status', 'component.checkstatus')
             ->get();
         // Determine unique dates with content
         $datesWithContent = $data->map(function ($item) {
             return (new \DateTime($item->created_at))->format('Y-m-d');
         })->unique()->sort()->values()->toArray(); // Convert to array
 
-        // Load the existing Excel template
-        $templatePath = storage_path('app/inventorytemplate.xlsx'); // Adjust the path to your template file
-        $spreadsheet = IOFactory::load($templatePath);
-
-        // Select the active sheet
+        $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Inventory Report');
 
-        // Set row positions
-        $rowMonth = 2;
-        $rowTitles = 3; // Row for date headers
-        $rowShifts = 4; // Row for shift headers
+        $rowTitle = 1;
+        $rowDateRange = 2;
+        $rowDateHeaders = 3;
+        $rowHeaders = 4;
+        $rowStart = 5;
         $shiftTimes = ['6-2', '2-10', '10-6'];
 
-        $currentDate = new \DateTime($fromDate);
-        $endDate = new \DateTime($toDate);
+        $currentDate = clone $fromDateObject;
+        $endDate = clone $toDateObject;
+        $fromDateLabel = $displayInventoryDate($from);
+        $toDateLabel = $displayInventoryDate($to);
+        if ($fromDateLabel === '') {
+            $fromDateLabel = $fromDateObject->format('m/d/Y');
+        }
+        if ($toDateLabel === '') {
+            $toDateLabel = $toDateObject->format('m/d/Y');
+        }
+        $reportDateLabel = 'from ' . $fromDateLabel . ' to ' . $toDateLabel;
 
-        $columnIndex = 5; // Starting column (E)
+        $sheet->setCellValue('A1', 'DISASTER TOOLS AND CONSUMABLES EQUIPMENT');
+        $sheet->setCellValue('A2', 'Inventory Report: ' . $reportDateLabel);
 
-        // Arrays to track headers
-        $processedDates = [];
+        $sheet->setCellValue('A4', 'No.');
+        $sheet->setCellValue('B4', 'Quantity');
+        $sheet->setCellValue('C4', 'Units');
+        $sheet->setCellValue('D4', 'Items');
+        $sheet->setCellValue('E4', 'Actual Count');
+        $sheet->setCellValue('F4', 'Status');
+
+        $sheet->getColumnDimension('A')->setWidth(8);
+        $sheet->getColumnDimension('B')->setWidth(12);
+        $sheet->getColumnDimension('C')->setWidth(14);
+        $sheet->getColumnDimension('D')->setWidth(45);
+        $sheet->getColumnDimension('E')->setWidth(16);
+        $sheet->getColumnDimension('F')->setWidth(20);
+
         $dateColumns = [];
-        $monthStartColumn = null;
-        $currentMonth = '';
+        $columnIndex = 7;
 
-        // Generate unique dates and shift columns
         while ($currentDate <= $endDate) {
             $shiftDate = $currentDate->format('Y-m-d');
-            $monthYear = $currentDate->format('F Y');
-
-
-            if ($currentMonth !== $monthYear) {
-
-                if ($monthStartColumn !== null) {
-                    // Merge cells for the previous month header
-                    $sheet->mergeCellsByColumnAndRow($monthStartColumn, $rowMonth, $columnIndex - 0, $rowMonth);
-                    $sheet->setCellValueByColumnAndRow($monthStartColumn, $rowMonth, $currentMonth);
-
-
-                    // Apply styles to the month header
-                    $sheet->getStyleByColumnAndRow($monthStartColumn, $rowMonth, $columnIndex - 0, $rowMonth)->applyFromArray([
-                        'font' => [
-                            'bold' => true,
-                            'size' => 14,
-                        ],
-                        'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_CENTER,
-                            'vertical' => Alignment::VERTICAL_CENTER,
-                        ],
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => 'D9EAD3'], // Light green background color
-                        ],
-                        'borders' => [
-                            'outline' => [
-                                'borderStyle' => Border::BORDER_THICK,
-                                'color' => ['argb' => 'FF000000'],
-                            ],
-                        ],
-                    ]);
-
-                    // Add the "Actual Count" and "Product" columns
-                    $sheet->setCellValueByColumnAndRow($monthStartColumn, $rowTitles, 'Actual Count');
-                    $sheet->mergeCellsByColumnAndRow($monthStartColumn, $rowTitles, $monthStartColumn, $rowShifts - 0);
-                    $sheet->getStyleByColumnAndRow($monthStartColumn, $rowTitles, $monthStartColumn, $rowShifts - 0)->applyFromArray([
-                        'font' => [
-                            'bold' => true,
-                        ],
-                        'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_CENTER,
-                            'vertical' => Alignment::VERTICAL_CENTER,
-                        ],
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => 'A4C2F4'], // Light blue background color
-                        ],
-                        'borders' => [
-                            'allBorders' => [
-                                'borderStyle' => Border::BORDER_MEDIUM,
-                                'color' => ['argb' => 'FF000000'],
-                            ],
-                        ],
-                    ]);
-
-                    $sheet->setCellValueByColumnAndRow($columnIndex, $rowTitles, 'Remarks');
-                    $sheet->mergeCellsByColumnAndRow($columnIndex, $rowTitles, $columnIndex, $rowShifts - 0);
-                    $sheet->getStyleByColumnAndRow($columnIndex, $rowTitles, $columnIndex, $rowShifts - 0)->applyFromArray([
-                        'font' => [
-                            'bold' => true,
-                        ],
-                        'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_CENTER,
-                            'vertical' => Alignment::VERTICAL_CENTER,
-                        ],
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => 'FFD966'], // Light orange background color
-                        ],
-                        'borders' => [
-                            'allBorders' => [
-                                'borderStyle' => Border::BORDER_MEDIUM,
-                                'color' => ['argb' => 'FF000000'],
-                            ],
-                        ],
-                    ]);
-
-                    $columnIndex++; // Move to the next column
-                }
-                $currentMonth = $monthYear;
-                $monthStartColumn = $columnIndex; // Set the start column for the new month
-
-                // Add the "Actual Count" column before the first date of the month
-                $sheet->setCellValueByColumnAndRow($columnIndex, $rowTitles, 'Actual Count');
-                $sheet->mergeCellsByColumnAndRow($columnIndex, $rowTitles, $columnIndex, $rowShifts - 0);
-                $sheet->getStyleByColumnAndRow($columnIndex, $rowTitles)->getAlignment()->setTextRotation(90); // Yellow background color
-                $sheet->getColumnDimensionByColumn($columnIndex)->setWidth(3.5);
-                $sheet->getStyleByColumnAndRow($columnIndex, $rowTitles, $columnIndex, $rowShifts - 0)->applyFromArray([
-                    'font' => [
-                        'bold' => true,
-                    ],
-                    'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
-                        'vertical' => Alignment::VERTICAL_CENTER,
-                    ],
-                    'fill' => [
-                        'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => 'A4C2F4'], // Light blue background color
-                    ],
-                    'borders' => [
-                        'allBorders' => [
-                            'borderStyle' => Border::BORDER_MEDIUM,
-                            'color' => ['argb' => 'FF000000'],
-                        ],
-                    ],
-                ]);
-
-                $columnIndex++; // Move to the next column for dates
-            }
-
-
             if (in_array($shiftDate, $datesWithContent)) {
-                if (!isset($processedDates[$shiftDate])) {
-                    $columnStart = $columnIndex;
-
-                    // Set date header
-                    $sheet->setCellValueByColumnAndRow($columnStart, $rowTitles, $shiftDate);
-                    $sheet->mergeCellsByColumnAndRow($columnStart, $rowTitles, $columnStart + (count($shiftTimes) - 1), $rowTitles); // Merge for shifts
-                    $sheet->getStyleByColumnAndRow($columnStart, $rowTitles)->getAlignment()->setWrapText(true); // Enable wrap text
-                    $sheet->getStyleByColumnAndRow($columnStart, $rowTitles)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF2CC'); // Yellow background color
-
-                    // Set shift times
-                    foreach ($shiftTimes as $shiftIndex => $shift) {
-                        $shiftColumn = $columnStart + $shiftIndex;
-                        $sheet->setCellValueByColumnAndRow($shiftColumn, $rowShifts, $shift);
-                        $sheet->getStyleByColumnAndRow($shiftColumn, $rowShifts)->getAlignment()->setWrapText(true); // Enable wrap text
-                        $sheet->getStyleByColumnAndRow($shiftColumn, $rowShifts)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('CCFFCC');
-                        $sheet->getStyleByColumnAndRow($shiftColumn, $rowShifts)->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
-                        $sheet->getStyleByColumnAndRow($shiftColumn, $rowShifts)->getAlignment()->setTextRotation(90);
-                        $sheet->getColumnDimensionByColumn($shiftColumn)->setWidth(3.5);
-                    }
-
-                    $dateColumns[$shiftDate] = [
-                        'start' => $columnStart,
-                        'end' => $columnStart + (count($shiftTimes) - 1),
-                    ];
-
-                    $sheet->getStyleByColumnAndRow($columnStart, $rowTitles, $columnStart + count($shiftTimes) - 1, $rowShifts)->applyFromArray([
-                        'borders' => [
-                            'allBorders' => [
-                                'borderStyle' => Border::BORDER_MEDIUM,
-                                'color' => ['argb' => '000000'],
-                            ],
-                        ],
-                    ]);
-
-                    $processedDates[$shiftDate] = true;
-                    $columnIndex += count($shiftTimes); // Move past shift columns
+                $columnStart = $columnIndex;
+                $sheet->setCellValueByColumnAndRow($columnStart, $rowDateHeaders, $shiftDate);
+                $sheet->mergeCellsByColumnAndRow($columnStart, $rowDateHeaders, $columnStart + 2, $rowDateHeaders);
+                foreach ($shiftTimes as $shiftIndex => $shift) {
+                    $shiftColumn = $columnStart + $shiftIndex;
+                    $sheet->setCellValueByColumnAndRow($shiftColumn, $rowHeaders, $shift);
+                    $sheet->getColumnDimensionByColumn($shiftColumn)->setWidth(10);
                 }
+                $dateColumns[$shiftDate] = [
+                    'start' => $columnStart,
+                    'end' => $columnStart + 2,
+                ];
+                $columnIndex += 3;
             }
 
             $currentDate->modify('+1 day');
         }
 
-        if ($monthStartColumn !== null) {
-            $sheet->mergeCellsByColumnAndRow($monthStartColumn, $rowMonth, $columnIndex - 0, $rowMonth);
-            $sheet->setCellValueByColumnAndRow($monthStartColumn, $rowMonth, $currentMonth);
-
-            // Apply styles to the month header
-            $sheet->getStyleByColumnAndRow($monthStartColumn, $rowMonth, $columnIndex - 0, $rowMonth)->applyFromArray([
-                'font' => [
-                    'bold' => true,
-                    'size' => 14,
-                ],
-                'alignment' => [
-                    'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER,
-                ],
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'D9EAD3'], // Light green background color
-                ],
-                'borders' => [
-                    'outline' => [
-                        'borderStyle' => Border::BORDER_THICK,
-                        'color' => ['argb' => 'FF000000'],
-                    ],
-                ],
-            ]);
-
-            // Add the "Remarks" column
-            $sheet->setCellValueByColumnAndRow($columnIndex, $rowTitles, 'Remarks');
-            $sheet->mergeCellsByColumnAndRow($columnIndex, $rowTitles, $columnIndex, $rowShifts - 0);
-            $sheet->getStyleByColumnAndRow($monthStartColumn, $rowTitles, $columnIndex, $rowShifts - 0)->applyFromArray([
-                'font' => [
-                    'bold' => true,
-                ],
-                'alignment' => [
-                    'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER,
-                ],
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'FFD966'], // Light orange background color
-                ],
-                'borders' => [
-                    'allBorders' => [
-                        'borderStyle' => Border::BORDER_MEDIUM,
-                        'color' => ['argb' => 'FF000000'],
-                    ],
-                ],
-            ]);
-        }
+        $remarksColumn = $columnIndex;
+        $sheet->setCellValueByColumnAndRow($remarksColumn, $rowHeaders, 'Remarks');
+        $sheet->getColumnDimensionByColumn($remarksColumn)->setWidth(30);
 
         // Process data
         $itemQuantities = [];
@@ -1195,7 +1081,8 @@ class Inventory extends Controller
             $itemQuantities[$itemName] = [];
             $itemDetails[$itemName] = [
                 'unit' => $item->unit,
-                'allQuantity' => $item->allQuantity
+                'allQuantity' => $item->allQuantity,
+                'status' => $item->status_label ?? '-'
             ];
         }
 
@@ -1210,8 +1097,24 @@ class Inventory extends Controller
             if (!isset($itemDetails[$itemName])) {
                 $itemDetails[$itemName] = [
                     'unit' => $row->unit,
-                    'allQuantity' => $row->allQuantity
+                    'allQuantity' => $row->allQuantity,
+                    'status' => '-'
                 ];
+            }
+
+            if (!empty($row->asset_status)) {
+                $statusMap = [
+                    '1' => trans('lang.readytodeploy'),
+                    '2' => trans('lang.pending'),
+                    '3' => trans('lang.archived'),
+                    '4' => trans('lang.broken'),
+                    '5' => trans('lang.lost'),
+                    '6' => trans('lang.outofrepair'),
+                ];
+
+                $itemDetails[$itemName]['status'] = $statusMap[(string) $row->asset_status] ?? $itemDetails[$itemName]['status'];
+            } elseif ($row->component_checkstatus !== null) {
+                $itemDetails[$itemName]['status'] = ((string) $row->component_checkstatus === '0') ? 'Available' : 'Issued';
             }
 
             if (!isset($itemQuantities[$itemName][$date])) {
@@ -1223,33 +1126,148 @@ class Inventory extends Controller
             $itemQuantities[$itemName][$date][$shiftIndex] += $quantity;
         }
 
-        // Write data to cells
-        $rowStart = 5;
-        $colStart = 5;
-
+        $currentRow = $rowStart;
         foreach ($itemQuantities as $itemName => $dates) {
-            $sheet->setCellValueByColumnAndRow(4, $rowStart, $itemName);
-            $sheet->setCellValueByColumnAndRow(3, $rowStart, $itemDetails[$itemName]['unit'] ?? '');
-            $sheet->setCellValueByColumnAndRow(2, $rowStart, $itemDetails[$itemName]['allQuantity'] ?? '');
-            $sheet->setCellValueByColumnAndRow(1, $rowStart, $rowStart - 4);
-
-
-             // Set item name in column D
+            $sheet->setCellValueByColumnAndRow(1, $currentRow, $currentRow - 4);
+            $sheet->setCellValueByColumnAndRow(2, $currentRow, $itemDetails[$itemName]['allQuantity'] ?? '');
+            $sheet->setCellValueByColumnAndRow(3, $currentRow, $itemDetails[$itemName]['unit'] ?? '');
+            $sheet->setCellValueByColumnAndRow(4, $currentRow, $itemName);
+            $sheet->setCellValueByColumnAndRow(6, $currentRow, $itemDetails[$itemName]['status'] ?? '-');
 
             foreach ($dateColumns as $date => $columns) {
-                if (isset($dates[$date])) {
-                    $shiftQuantities = $dates[$date];
-                } else {
-                    $shiftQuantities = array_fill(0, count($shiftTimes), 0);
-                }
+                $shiftQuantities = isset($dates[$date]) ? $dates[$date] : array_fill(0, count($shiftTimes), 0);
 
                 foreach ($shiftQuantities as $shiftIndex => $quantity) {
-                    $sheet->setCellValueByColumnAndRow($columns['start'] + $shiftIndex, $rowStart, $quantity);
+                    $sheet->setCellValueByColumnAndRow($columns['start'] + $shiftIndex, $currentRow, $quantity ?: '');
                 }
             }
 
-            $rowStart++;
+            $currentRow++;
         }
+
+        $lastRow = max($currentRow - 1, $rowHeaders);
+        $lastColumn = $remarksColumn;
+        $lastColumnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($lastColumn);
+
+        $sheet->mergeCellsByColumnAndRow(1, $rowTitle, $lastColumn, $rowTitle);
+        $sheet->mergeCellsByColumnAndRow(1, $rowDateRange, $lastColumn, $rowDateRange);
+
+        $sheet->getStyleByColumnAndRow(1, $rowTitle, $lastColumn, $rowTitle)->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'size' => 16,
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'F79646'],
+            ],
+        ]);
+        $sheet->getStyleByColumnAndRow(1, $rowDateRange, $lastColumn, $rowDateRange)->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'size' => 11,
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+        ]);
+
+        $sheet->getStyleByColumnAndRow(1, $rowDateHeaders, $lastColumn, $rowHeaders)->applyFromArray([
+            'font' => [
+                'bold' => true,
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'D9EAD3'],
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF000000'],
+                ],
+            ],
+        ]);
+        $sheet->getStyleByColumnAndRow(1, $rowHeaders, $lastColumn, $lastRow)->applyFromArray([
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF000000'],
+                ],
+            ],
+            'alignment' => [
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+        ]);
+        $sheet->getStyleByColumnAndRow(1, $rowStart, 3, $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyleByColumnAndRow(5, $rowStart, $lastColumn, $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyleByColumnAndRow(4, $rowStart, 4, $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+        $sheet->getStyleByColumnAndRow($remarksColumn, $rowStart, $remarksColumn, $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+        for ($row = $rowStart; $row <= $lastRow; $row++) {
+            $sheet->getRowDimension($row)->setRowHeight(20);
+        }
+
+        $signatoryRow = $lastRow + 4;
+        $checkedStartColumn = 1;
+        $checkedEndColumn = 3;
+        $notedStartColumn = 4;
+        $notedEndColumn = 6;
+
+        $sheet->mergeCellsByColumnAndRow($checkedStartColumn, $signatoryRow, $checkedEndColumn, $signatoryRow);
+        $sheet->mergeCellsByColumnAndRow($checkedStartColumn, $signatoryRow + 1, $checkedEndColumn, $signatoryRow + 1);
+        $sheet->mergeCellsByColumnAndRow($notedStartColumn, $signatoryRow, $notedEndColumn, $signatoryRow);
+        $sheet->mergeCellsByColumnAndRow($notedStartColumn, $signatoryRow + 1, $notedEndColumn, $signatoryRow + 1);
+
+        $sheet->setCellValueByColumnAndRow($checkedStartColumn, $signatoryRow, 'Checked by: DOMINIC A. NAVARRO');
+        $sheet->setCellValueByColumnAndRow($checkedStartColumn, $signatoryRow + 1, 'Section Head - Logistics');
+        $sheet->setCellValueByColumnAndRow($notedStartColumn, $signatoryRow, 'Noted by: LEONARDO S. SESE JR.');
+        $sheet->setCellValueByColumnAndRow($notedStartColumn, $signatoryRow + 1, 'Division Head - Operation and Warning');
+
+        $sheet->getStyleByColumnAndRow($checkedStartColumn, $signatoryRow, $notedEndColumn, $signatoryRow)->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'size' => 11,
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+        ]);
+        $sheet->getStyleByColumnAndRow($checkedStartColumn, $signatoryRow + 1, $notedEndColumn, $signatoryRow + 1)->applyFromArray([
+            'font' => [
+                'size' => 10,
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+        ]);
+
+        $sheet->getRowDimension(1)->setRowHeight(28);
+        $sheet->getRowDimension(2)->setRowHeight(22);
+        $sheet->getRowDimension(3)->setRowHeight(22);
+        $sheet->getRowDimension(4)->setRowHeight(24);
+
+        $sheet->setAutoFilter("A4:{$lastColumnLetter}{$lastRow}");
+        $sheet->freezePane('A5');
+        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
+        $sheet->getPageSetup()->setFitToWidth(1);
+        $sheet->getPageSetup()->setFitToHeight(0);
+        $sheet->getPageMargins()->setTop(0.5);
+        $sheet->getPageMargins()->setRight(0.25);
+        $sheet->getPageMargins()->setLeft(0.25);
+        $sheet->getPageMargins()->setBottom(0.5);
 
         // Save the file
         $filename = 'inventory_report_' . date('Y-m-d_H-i-s') . '.xlsx';

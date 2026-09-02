@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\ReceiverModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Used extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -129,6 +131,7 @@ class Used extends Controller
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail('Utilities', 'Create', 'Created use of equipment: '.$used.'.', 'Use of Equipment', null, null, ['name' => $used, 'description' => $description]);
             } else {
                 $res['message'] = 'failed';
             }
@@ -164,6 +167,7 @@ class Used extends Controller
         if ($categorycheck) {
             $res['message'] = 'exist';
         } else {
+            $oldUsed = DB::table('used')->where('id', $id)->where('is_delete', 0)->first();
 
             $update = DB::table('used')->where('id', $id)->where('is_delete', 0)
                 ->update(
@@ -175,6 +179,9 @@ class Used extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $diff = $this->auditCalculateDiff($oldUsed, ['used' => $used, 'description' => $description], ['used' => 'Name', 'description' => 'Description']);
+                $detailsText = 'Updated use of equipment: '.$used.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Use of Equipment', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -196,11 +203,13 @@ class Used extends Controller
         //set delete if no assets to this user
 
         $id = $request->input('id');
+        $used = DB::table('used')->where('id', $id)->where('is_delete', 0)->first();
 
         $delete = DB::table('used')->where('id', $id)->where('is_delete', 0)->update(['is_delete' => 1]);
 
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Utilities', 'Delete', 'Deleted use of equipment ID: '.$id.'.', 'Use of Equipment', $id, ['name' => $used->used ?? '-', 'description' => $used->Description ?? '-'], null);
         } else {
             $res['success'] = 'failed';
         }

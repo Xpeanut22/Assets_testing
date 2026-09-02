@@ -32,10 +32,14 @@ Route::get('/usedlist','Used@index');
 
 Route::get('/userlist','User@index');
 Route::get('/settinglist','Settings@index');
+Route::get('/settinglist/audittrail','Settings@audittrail');
+Route::get('/settinglist/audittrail/print/{slug?}','Settings@printaudittrail');
 Route::get('/assetlist','Asset@index');
+Route::get('/assetlist/print/{slug?}','Reports@printassetlist');
 Route::get('/assetlist/detail/{id}','Asset@detail');
 Route::get('/assetlist/generatelabel/{id}', 'Asset@generatelabel');
 Route::get('/assetvehiclelist','AssetVehicle@index');
+Route::get('/assetvehiclelist/print/{slug?}','Reports@printassetvehiclelist');
 Route::get('/assetvehiclelist/detail/{id}','AssetVehicle@detail');
 Route::get('/assetvehiclelist/generatelabel/{id}', 'AssetVehicle@generatelabel');
 Route::get('/assetvehiclelist/borrowedform/{id}', 'AssetVehicle@borrowedform');
@@ -57,21 +61,30 @@ Route::get('/inventorylist/detail/{inventoryid}','Inventory@detail');
 Route::post('/logScan','Inventory@logScan');
 Route::post('/saveItems','Inventory@saveItems');
 Route::get('/maintenancelist','Maintenance@index');
+Route::get('/maintenancelist/print/{slug?}','Reports@printmaintenancelist');
 Route::get('/depreciationlist','Depreciation@index');
 
 
 //report
 Route::get('/reports/assetactivity','Reports@assetactivity');
+Route::get('/reports/assetactivity/print/{slug?}','Reports@printassetactivityreport');
 Route::get('/reports/componentactivity','Reports@componentactivity');
+Route::get('/reports/componentactivity/print/{slug?}','Reports@printissuanceactivityreport');
 Route::get('/reports/maintenance','Reports@maintenance');
+Route::get('/reports/maintenance/print/{slug?}','Reports@printmaintenancereport');
 Route::get('/reports/bytype','Reports@bytype');
+Route::get('/reports/bytype/print/{slug?}','Reports@printbytypereport');
 Route::get('/reports/bystatus','Reports@bystatus');
+Route::get('/reports/bystatus/print/{slug?}','Reports@printbystatusreport');
 Route::get('/reports/bylocation','Reports@bylocation');
+Route::get('/reports/bylocation/print/{slug?}','Reports@printbylocationreport');
 Route::get('/reports/bysupplier','Reports@bysupplier');
+Route::get('/reports/bysupplier/print/{slug?}','Reports@printbysupplierreport');
 Route::get('/reports/allreports','Reports@allreports');
 
 //utilities
 Route::get('/utilities/allutilities','Utilities@allutilities');
+Route::get('/utilities/print/{type}/{slug?}','Utilities@printutility');
 
 
 
@@ -197,6 +210,9 @@ Route::post('User/requestpass', 'User@requestpass');
 //Settings API
 Route::get('settings', 'Settings@getdata');
 Route::post('updatesettings', 'Settings@update');
+Route::get('audittrail', 'Settings@audittraildata');
+Route::post('audittrailbyid', 'Settings@audittrailbyid');
+Route::get('audittrail/print/{slug?}', 'Settings@printaudittrail');
 
 // Search API
 Route::post('assetbytag', 'Asset@byassettag');
@@ -307,7 +323,9 @@ Route::get('generateControlNumber', 'Asset@generateControlNumber');
 
 // print API
 // Route::get('assetprintform', ['Asset@assetprintform']);
+Route::get('assetprintform/{id}', 'Asset@assetprintform');
 Route::post('assetprintform', 'Asset@assetprintform');
+Route::get('assethistoryprint/{id}/{slug?}', 'Asset@printassethistoryreport');
 // Route::post('/assetprintform', [Asset::class, 'assetprintform']);
 
 

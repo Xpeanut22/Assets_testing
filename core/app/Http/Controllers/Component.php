@@ -7,6 +7,7 @@ use App\ComponentModel;
 use Illuminate\Support\Facades\File;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -18,6 +19,7 @@ require(app_path('fpdf\fpdf.php'));
 class Component extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -45,7 +47,7 @@ class Component extends Controller
     }
 
     /**
-     * check quantity 
+     * check quantity
      * @return object
      */
     public function checkquantity($componentid, $quantity, $status)
@@ -86,6 +88,7 @@ class Component extends Controller
             ->where('component_assets.status', $status)
             ->where('component.groupid', $groupid)
             ->where('component.serial', $serial)
+            ->where('component.is_delete', 0)
             ->first();
         $remain = $quantity - $usedquantity;
         if (!$used) {
@@ -106,16 +109,19 @@ class Component extends Controller
      */
     public function getdata()
     {
+        $componentDeleteFilter = DB::getSchemaBuilder()->hasColumn('component', 'is_delete') ? 'where component.is_delete = 0' : '';
+
         $data = DB::select("select component.*, component_assets.created_by cacreated ,component_assets.quantity as caquantity, supplier.name as supplier, location.name as location, brand.name as brand, asset_type.name as type, component_assets.control_number, component_assets.issuancetype
-        from component left join supplier 
+        from component left join supplier
         on component.supplierid = supplier.id
-        left join brand 
+        left join brand
         on component.brandid = brand.id
-        left join location 
+        left join location
         on component.locationid = location.id
         left join asset_type
         on component.typeid = asset_type.id left join component_assets
-        on component_assets.componentid = component.id 
+        on component_assets.componentid = component.id
+        $componentDeleteFilter
         order by component.created_at desc");
         return Datatables::of($data)
             ->addColumn('avalaiblequantity', function ($single) {
@@ -162,29 +168,39 @@ class Component extends Controller
 
     public function getGroupedComponents()
     {
+        $hasComponentDeleteColumn = DB::getSchemaBuilder()->hasColumn('component', 'is_delete');
+        $componentDeleteFilter = $hasComponentDeleteColumn ? 'AND is_delete = 0' : '';
+        $componentAliasDeleteFilter = $hasComponentDeleteColumn ? 'AND c.is_delete = 0' : '';
+        $componentControlDeleteFilter = $hasComponentDeleteColumn ? 'AND cc.is_delete = 0' : '';
+
         $data = DB::select("
-        SELECT 
+        SELECT
             c.name,
             COUNT(*) as total,
             (
-                SELECT picture 
-                FROM component 
-                WHERE name = c.name 
-                AND picture IS NOT NULL 
+                SELECT picture
+                FROM component
+                WHERE name = c.name
+                AND picture IS NOT NULL
+                $componentDeleteFilter
                 LIMIT 1
             ) as picture,
             (
                 SELECT GROUP_CONCAT(serial SEPARATOR ',')
                 FROM component
                 WHERE name = c.name
+                $componentDeleteFilter
             ) as all_serials,
             (
                 SELECT GROUP_CONCAT(control_number SEPARATOR ',')
                 FROM component_assets ca
                 LEFT JOIN component cc ON cc.id = ca.componentid
                 WHERE cc.name = c.name
+                $componentControlDeleteFilter
             ) as all_controls
         FROM component c
+        WHERE 1 = 1
+        $componentAliasDeleteFilter
         GROUP BY c.name
         ORDER BY c.name
     ");
@@ -216,9 +232,11 @@ class Component extends Controller
 
     public function getComponentsByName($name)
     {
+        $componentDeleteFilter = DB::getSchemaBuilder()->hasColumn('component', 'is_delete') ? 'AND component.is_delete = 0' : '';
+
         $data = DB::select("
-        SELECT 
-            component.*, 
+        SELECT
+            component.*,
             supplier.name as supplier,
             location.name as location,
             brand.name as brand,
@@ -253,27 +271,28 @@ class Component extends Controller
         LEFT JOIN location ON component.locationid = location.id
         LEFT JOIN asset_type ON component.typeid = asset_type.id
         WHERE component.name = ?
+        $componentDeleteFilter
     ", [$name]);
 
         foreach ($data as $row) {
 
             $row->action = '
         <div class="btn-group">
-            <button class="btn btn-sm btn-primary dropdown-toggle" 
+            <button class="btn btn-sm btn-primary dropdown-toggle"
                 type="button" data-toggle="dropdown">
                 <i class="fa fa-ellipsis-h"></i>
             </button>
             <div class="dropdown-menu actionmenu">
-                <a class="dropdown-item" 
+                <a class="dropdown-item"
                     href="' . url('/') . '/componentlist/detail/' . $row->id . '">
                     <i class="fa fa-file-text"></i> Detail
                 </a>
-                <a class="dropdown-item" 
+                <a class="dropdown-item"
                     href="#" customdata=' . $row->id . '
                     data-toggle="modal" data-target="#edit">
                     <i class="fa fa-pencil"></i> Edit
                 </a>
-                <a class="dropdown-item" 
+                <a class="dropdown-item"
                     href="#" customdata=' . $row->id . '
                     data-toggle="modal" data-target="#delete">
                     <i class="fa fa-trash"></i> Delete
@@ -295,8 +314,8 @@ class Component extends Controller
     public function isnotbyid()
     {
 
-        $data = DB::table("component")->select('*')->whereNotIn('id', function ($query) {
-            $query->select('componentid')->from('depreciation')->whereNotNull('componentid');
+        $data = DB::table("component")->select('*')->where('is_delete', 0)->whereNotIn('id', function ($query) {
+            $query->select('componentid')->from('depreciation')->whereNotNull('componentid')->where('is_delete', 0);
         })->get();
 
         if ($data) {
@@ -310,7 +329,7 @@ class Component extends Controller
 
 
     /**
-     * get single data 
+     * get single data
      * @param integer $id
      * @return object
      */
@@ -319,17 +338,25 @@ class Component extends Controller
     {
         $id            = $request->input('id');
 
-        $data = DB::table('component')->select('component.*', 'component.name as componentname', 'component.created_at as assetcreated_at', 'component.updated_at as assetupdated_at', 'component.description as componentdescription', 'brand.*', 'brand.name as brand', 'asset_type.name as type', 'supplier.name as supplier', 'location.name as location')
-            ->join('brand', 'brand.id', '=', 'component.brandid')
-            ->join('asset_type', 'asset_type.id', '=', 'component.typeid')
-            ->join('supplier', 'supplier.id', '=', 'component.supplierid')
-            ->join('location', 'location.id', '=', 'component.locationid')
-            ->where('component.id', $id)
-            ->first();
+        $query = DB::table('component')->select('component.*', 'component.name as componentname', 'component.created_at as assetcreated_at', 'component.updated_at as assetupdated_at', 'component.description as componentdescription', 'brand.name as brand', 'asset_type.name as type', 'supplier.name as supplier', 'location.name as location')
+            ->leftJoin('brand', 'brand.id', '=', 'component.brandid')
+            ->leftJoin('asset_type', 'asset_type.id', '=', 'component.typeid')
+            ->leftJoin('supplier', 'supplier.id', '=', 'component.supplierid')
+            ->leftJoin('location', 'location.id', '=', 'component.locationid')
+            ->where('component.id', $id);
+
+        if (DB::getSchemaBuilder()->hasColumn('component', 'is_delete')) {
+            $query->where(function ($innerQuery) {
+                $innerQuery->where('component.is_delete', 0)->orWhereNull('component.is_delete');
+            });
+        }
+
+        $data = $query->first();
 
         if ($data) {
 
             //set status
+            $status = '-';
             if ($data->status == '1') {
                 $status = trans('lang.readytodeploy');
             }
@@ -350,20 +377,37 @@ class Component extends Controller
             }
 
             //get date format setting
-            $setting = DB::table('settings')->where('id', '1')->first();
+            $settingObj = DB::table('settings')->where('id', '1')->first();
+            $dateFormat = ($settingObj && !empty($settingObj->formatdate)) ? $settingObj->formatdate : 'Y-m-d';
+            $currency = ($settingObj && isset($settingObj->currency)) ? $settingObj->currency : '';
 
+            $formatDate = function($dateStr) use ($dateFormat) {
+                if (empty($dateStr)) {
+                    return '-';
+                }
+                $time = strtotime($dateStr);
+                return ($time !== false) ? date($dateFormat, $time) : '-';
+            };
 
             $res['success'] = 'success';
             $res['message'] = $data;
-            $res['assetcreated_at'] = date($setting->formatdate, strtotime($data->assetcreated_at));
-            $res['assetupdated_at'] = date($setting->formatdate, strtotime($data->updated_at));
-            $res['assetpurchasedate'] = date($setting->formatdate, strtotime($data->purchasedate));
-            $res['assetcost'] = $setting->currency . $data->cost;
+            $res['assetcreated_at'] = $formatDate($data->assetcreated_at ?? null);
+            $res['assetupdated_at'] = $formatDate($data->updated_at ?? null);
+            $res['assetpurchasedate'] = $formatDate($data->purchasedate ?? null);
+            $res['assetcost'] = isset($data->cost) && $data->cost !== '' ? $currency . $data->cost : '-';
             $res['assetstatus'] = $status;
-            $res['assetbarcode'] = '<img src="data:image/png;base64,' . DNS2D::getBarcodePNG($data->serial, 'QRCODE') . '" alt="barcode" width="70"  />';
 
+            $assetbarcode = '-';
+            if (!empty($data->serial)) {
+                try {
+                    $assetbarcode = '<img src="data:image/png;base64,' . DNS2D::getBarcodePNG((string)$data->serial, 'QRCODE') . '" alt="barcode" width="70" />';
+                } catch (\Throwable $e) {
+                    $assetbarcode = '-';
+                }
+            }
+            $res['assetbarcode'] = $assetbarcode;
 
-            $assetImage = $data->picture ?: 'pic.png';
+            $assetImage = !empty($data->picture) ? $data->picture : 'pic.png';
             $res['assetimage']  = url('/upload/assets/' . $assetImage);
         } else {
             $res['success'] = 'failed';
@@ -373,7 +417,7 @@ class Component extends Controller
 
 
     /**
-     * get single data 
+     * get single data
      * @param integer $id
      * @return object
      */
@@ -478,6 +522,7 @@ class Component extends Controller
                 'picture' => $picturename,
                 'description' => $description,
                 'checkstatus' => 0,
+                'is_delete' => 0,
                 'created_at' => $created_at,
                 'updated_at' => $updated_at,
                 'groupid' => $newGroupid
@@ -490,6 +535,10 @@ class Component extends Controller
                 $res['message'] = 'failed';
                 break; // Exit loop if any insert fails
             }
+        }
+
+        if ($res['message'] === 'success') {
+            $this->auditTrail('Issuance', 'Create', 'Created component: '.$name.' ('.count($serialsArray).' item/s).');
         }
 
         return response($res);
@@ -523,7 +572,7 @@ class Component extends Controller
     //             $this->validate($request, ['picture' => 'mimes:jpeg,png,jpg|max:2048'],$message);
     //             $picturename  = date('mdYHis').uniqid().$request->file('picture')->getClientOriginalName();
     //             $request->file('picture')->move(public_path("/upload/assets"), $picturename);
-    //             $data       = array('name'=>$name, 
+    //             $data       = array('name'=>$name,
     //                         'locationid'=>$locationid,
     //                         'supplierid'=>$supplierid,
     //                         'brandid'=>$brandid,
@@ -539,10 +588,10 @@ class Component extends Controller
     //                         'checkstatus'=>0,
     //                         'created_at'=>$created_at,
     //                         'updated_at'=>$updated_at);
-    //             $insert     = DB::table( 'component' )->insert( $data ); 
+    //             $insert     = DB::table( 'component' )->insert( $data );
 
     //         }else{
-    //             $data       = array('name'=>$name, 
+    //             $data       = array('name'=>$name,
     //                             'locationid'=>$locationid,
     //                             'supplierid'=>$supplierid,
     //                             'typeid'=>$typeid,
@@ -605,6 +654,7 @@ class Component extends Controller
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
         $message = ['picture.mimes' => trans('lang.upload_error')];
+        $oldComponent       = DB::table('component')->where('id', $id)->where('is_delete', 0)->first();
 
 
 
@@ -614,7 +664,7 @@ class Component extends Controller
             $picturename  = date('mdYHis') . uniqid() . $request->file('picture')->getClientOriginalName();
             $request->file('picture')->move(public_path("/upload/assets"), $picturename);
 
-            $update = DB::table('component')->where('id', $id)
+            $update = DB::table('component')->where('id', $id)->where('is_delete', 0)
                 ->update(
                     [
                         'name'                => $name,
@@ -635,7 +685,7 @@ class Component extends Controller
                     ]
                 );
         } else {
-            $update = DB::table('component')->where('id', $id)
+            $update = DB::table('component')->where('id', $id)->where('is_delete', 0)
                 ->update(
                     [
                         'name'                => $name,
@@ -658,6 +708,37 @@ class Component extends Controller
 
         if ($update) {
             $res['message'] = 'success';
+            $labelMap = [
+                'name' => 'Name',
+                'serial' => 'Serial',
+                'locationid' => 'Location ID',
+                'supplierid' => 'Supplier ID',
+                'brandid' => 'Brand ID',
+                'typeid' => 'Type ID',
+                'quantity' => 'Quantity',
+                'unit' => 'Unit',
+                'purchasedate' => 'Purchase Date',
+                'warranty' => 'Warranty',
+                'status' => 'Status',
+                'description' => 'Description'
+            ];
+            $newData = [
+                'name' => $name,
+                'serial' => $serial,
+                'locationid' => $locationid,
+                'supplierid' => $supplierid,
+                'brandid' => $brandid,
+                'typeid' => $typeid,
+                'quantity' => $quantity,
+                'unit' => $unit,
+                'purchasedate' => $purchasedate,
+                'warranty' => $warranty,
+                'status' => $status,
+                'description' => $description
+            ];
+            $diff = $this->auditCalculateDiff($oldComponent, $newData, $labelMap);
+            $detailsText = 'Updated component: '.$name.' ('.$serial.')' . ($diff['details'] ? ":\n" . $diff['details'] : '');
+            $this->auditTrail('Issuance', 'Update', $detailsText, 'Issuance', $id, $diff['old'], $diff['new']);
         } else {
             $res['message'] = 'failed';
         }
@@ -694,7 +775,16 @@ class Component extends Controller
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
 
-        $balance = DB::table('component')->select('quantity')->where('id', $componentid)->first();
+        $hasComponentDeleteColumn = DB::getSchemaBuilder()->hasColumn('component', 'is_delete');
+        $balanceQuery = DB::table('component')->select('quantity')->where('id', $componentid);
+        if ($hasComponentDeleteColumn) {
+            $balanceQuery->where('is_delete', 0);
+        }
+        $balance = $balanceQuery->first();
+        if (!$balance) {
+            $res['success'] = 'failed';
+            return response($res);
+        }
         $checkquantity = $this->checkquantity($componentid, $balance->quantity, 1);
         $remain =  $checkquantity - $quantity;
 
@@ -707,13 +797,16 @@ class Component extends Controller
             if ($insert) {
 
                 //set status in table asset
-                $update = DB::table('component')->where('id', $componentid)
-                    ->update(
-                        [
-                            'checkstatus'         => $checkstatus,
-                            'updated_at'          => $updated_at
-                        ]
-                    );
+                $updateQuery = DB::table('component')->where('id', $componentid);
+                if ($hasComponentDeleteColumn) {
+                    $updateQuery->where('is_delete', 0);
+                }
+                $update = $updateQuery->update(
+                    [
+                        'checkstatus'         => $checkstatus,
+                        'updated_at'          => $updated_at
+                    ]
+                );
 
                 $res['success'] = 'success';
             } else {
@@ -734,10 +827,32 @@ class Component extends Controller
             ], 400);
         }
 
+        if (!$request->filled('checkoutemployeeid1')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select Issued to.'
+            ], 422);
+        }
+
+        if (!$request->filled('depid')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select Department / Office Representing.'
+            ], 422);
+        }
+
+        if (!$request->filled('core')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select Condition of Equipment.'
+            ], 422);
+        }
+
         $timestamp = now();
         $receiverby = Auth::user()->fullname;
         $successSaves = 0;
         $insertedIds = [];
+        $hasComponentDeleteColumn = DB::getSchemaBuilder()->hasColumn('component', 'is_delete');
 
         // // Generate groupid
         // $lastGroupId = DB::table('component_assets')->max('groupid');
@@ -749,9 +864,14 @@ class Component extends Controller
                 continue;
             }
 
-            $dbComponent = DB::table('component')
-                ->where('id', $component['id'])
-                ->first();
+            $componentQuery = DB::table('component')
+                ->where('id', $component['id']);
+
+            if ($hasComponentDeleteColumn) {
+                $componentQuery->where('is_delete', 0);
+            }
+
+            $dbComponent = $componentQuery->first();
 
             if (!$dbComponent) {
                 continue;
@@ -793,12 +913,17 @@ class Component extends Controller
             if ($insertId) {
                 $insertedIds[] = $insertId;
 
-                DB::table('component')
-                    ->where('id', $dbComponent->id)
-                    ->update([
-                        'checkstatus' => 2,
-                        'updated_at'  => $timestamp
-                    ]);
+                $updateQuery = DB::table('component')
+                    ->where('id', $dbComponent->id);
+
+                if ($hasComponentDeleteColumn) {
+                    $updateQuery->where('is_delete', 0);
+                }
+
+                $updateQuery->update([
+                    'checkstatus' => 2,
+                    'updated_at'  => $timestamp
+                ]);
 
                 $successSaves++;
             }
@@ -811,10 +936,13 @@ class Component extends Controller
             ], 422);
         }
 
+        $this->auditTrail('Issuance', 'Scan', 'Issued '.$successSaves.' item/s. Control number: '.($request->controlno ?: '-').'.');
+
         return response()->json([
             'success' => true,
             'saved'   => $successSaves,
-            'print_url' => url('component/batchissuanceprint') . '?ids=' . implode(',', $insertedIds)
+            'print_url' => url('component/batchissuanceprint') . '?ids=' . implode(',', $insertedIds),
+            'pdf_url' => url('component/batchissuanceprint') . '?ids=' . implode(',', $insertedIds) . '&download=1'
         ]);
     }
 
@@ -869,6 +997,53 @@ class Component extends Controller
         $controlNumber = $first->control_number ?: '-';
         $issueDate = $first->date ? date('m/d/Y H:i', strtotime($first->date)) : date('m/d/Y H:i');
         $issuedBy = Auth::user()->fullname ?: ($first->created_by ?: '-');
+
+        if ($request->query('printout')) {
+            $e = function ($value) {
+                return e($value ?: '-');
+            };
+            $itemRows = '';
+            $rowNo = 1;
+            foreach ($rows as $item) {
+                $description = trim(($item->component_name ?: '-') . ' / ' . ($item->component_serial ?: '-'));
+                $itemRows .= '<tr>'
+                    . '<td>' . $rowNo . '.</td>'
+                    . '<td>' . $e($description) . '</td>'
+                    . '<td>' . $e($item->quantity) . '</td>'
+                    . '<td>' . e($item->remarks ?: '') . '</td>'
+                    . '</tr>';
+                $rowNo++;
+            }
+            while ($rowNo <= 5) {
+                $itemRows .= '<tr><td>' . $rowNo . '.</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>';
+                $rowNo++;
+            }
+
+            $html = '<!doctype html><html><head><meta charset="utf-8"><title>Issuance Printout</title>'
+                . '<style>'
+                . '@page{size:legal;margin:12mm}body{font-family:Arial,sans-serif;color:#000;margin:0}.page{width:190mm;margin:0 auto}.center{text-align:center}.header{position:relative;padding-top:4px}.logo{position:absolute;top:0;width:72px;height:72px;object-fit:contain}.left-logo{left:0}.right-logo{right:0}.rule{border-top:3px solid #000;border-bottom:1px solid #000;height:3px;margin:8px 0 22px}.top-row{display:flex;justify-content:space-between;margin-bottom:22px;font-size:16px}.underline{display:inline-block;min-width:120px;border-bottom:1px solid #000;padding-left:8px}.title{font-weight:bold;font-size:18px;margin:18px 0 26px}.field{margin:5px 0;font-size:14px}.field span{display:inline-block;border-bottom:1px solid #000;min-width:260px;padding-left:8px}h3{font-size:16px;margin:22px 0 8px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #000;padding:8px;vertical-align:middle}th{background:#aeaA88;text-align:center}td:nth-child(1),td:nth-child(3){text-align:center}.signatures{margin-top:38px;font-size:13px}.sig-row{display:flex;justify-content:space-between;margin-top:18px}.sig{width:38%;text-align:center}.line{border-bottom:1px solid #000;height:22px;margin-bottom:4px}.name{font-weight:bold}.footer-note{margin-top:18px;font-size:12px}@media print{.no-print{display:none}.page{width:auto}body{margin:0}}'
+                . '</style></head><body onload="setTimeout(function(){window.print();},300)">'
+                . '<button class="no-print" onclick="window.print()" style="position:fixed;right:16px;top:16px;padding:8px 14px">Print</button>'
+                . '<div class="page"><div class="header center">'
+                . '<div>Republic of the Philippines</div><strong>CITY GOVERNMENT OF MUNTINLUPA</strong><div>City of Muntinlupa</div>'
+                . '<strong>DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT</strong><div>(Formerly Muntinlupa City Disaster Risk Reduction Management Office)</div>'
+                . '<div>Hall of Justice Compound, Resilience Building, Susana Heights, Tunasan, Muntinlupa City</div><div>Tel No.: 8925-43-82</div>'
+                . '<div class="rule"></div></div>'
+                . '<div class="top-row"><div>DATE:<span class="underline">' . $e($issueDate) . '</span></div><div><div>CGM-OP-MCDRRM-01F2</div><div>Control No.<span class="underline">' . $e($controlNumber) . '</span></div></div></div>'
+                . '<div class="center title">MATERIALS & EQUIPMENT ISSUANCE FORM</div>'
+                . '<div class="field"><strong>Name:</strong><span>' . $e($issuedTo) . '</span></div>'
+                . '<div class="field"><strong>Department:</strong><span>' . $e($department) . '</span></div>'
+                . '<div class="field"><strong>Contact Number:</strong><span>' . $e($contactNo) . '</span></div>'
+                . '<h3 class="center">Material/Equipment Requested</h3>'
+                . '<table><thead><tr><th style="width:12%">No.</th><th>Item(s) Description</th><th style="width:18%">Quantity</th><th style="width:24%">Remarks</th></tr></thead><tbody>' . $itemRows . '</tbody></table>'
+                . '<div class="footer-note">Please verify all information before releasing the materials/equipment.</div>'
+                . '<div class="signatures">'
+                . '<div class="sig-row"><div class="sig">RECEIVED BY:<div class="line name">' . $e($issuedTo) . '</div>Signature Over Printed Name</div><div class="sig">CHECKED BY:<div class="line name">ALMOND G. GREGORIO</div>Section Head - Logistic</div></div>'
+                . '<div class="sig-row"><div class="sig">ISSUED BY:<div class="line name">' . $e($issuedBy) . '</div>Signature Over Printed Name</div><div class="sig">APPROVED BY:<div class="line name">ERWIN O. ALFONSO</div>Department Head - DDRM</div></div>'
+                . '</div></div></body></html>';
+
+            return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+        }
 
         $pdf = new \FPDF('P', 'mm', 'LEGAL');
         $pdf->AliasNbPages();
@@ -1022,11 +1197,14 @@ class Component extends Controller
         }
 
         $safeControlNo = preg_replace('/[^A-Za-z0-9\-_]/', '_', $controlNumber);
-        $filename = 'material_issuance_' . ($safeControlNo ?: 'batch') . '.pdf';
+        $safeIssuedTo = preg_replace('/[^A-Za-z0-9\-_]/', '_', (string) $issuedTo);
+        $filename = 'material_issuance_' . trim(($safeIssuedTo ?: 'issued_to') . '_' . ($safeControlNo ?: 'batch'), '_') . '.pdf';
+        $pdf->SetTitle('Material Issuance - ' . ($issuedTo ?: 'Issued To') . ' (' . ($controlNumber ?: 'Batch') . ')');
+        $disposition = $request->query('download') ? 'attachment' : 'inline';
 
         return response($pdf->Output('S'))
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
+            ->header('Content-Disposition', $disposition . '; filename="' . $filename . '"');
     }
 
     public function generateControlNumber(Request $request)
@@ -1101,6 +1279,7 @@ class Component extends Controller
 
                 $component = DB::table('component')
                     ->where('id', $componentId)
+                    ->where('is_delete', 0)
                     ->first();
 
                 if (!$component) continue;
@@ -1127,6 +1306,7 @@ class Component extends Controller
 
                 DB::table('component')
                     ->where('id', $component->id)
+                    ->where('is_delete', 0)
                     ->update([
                         'checkstatus' => 2,
                         'updated_at' => now()
@@ -1154,6 +1334,7 @@ class Component extends Controller
         $components = DB::table('component')
             ->where('groupid', $groupid)
             ->where('checkstatus', 0) // only available
+            ->where('is_delete', 0)
             ->get();
 
         return response()->json([
@@ -1199,7 +1380,11 @@ class Component extends Controller
 
 
         //check balance
-        $balance = DB::table('component')->select('quantity')->where('id', $componentid)->first();
+        $balance = DB::table('component')->select('quantity')->where('id', $componentid)->where('is_delete', 0)->first();
+        if (!$balance) {
+            $res['success'] = 'failed';
+            return response($res);
+        }
         $checkquantity = $this->checkquantity($componentid, $balance->quantity, 2);
         $remain =  $checkquantity - $quantity;
 
@@ -1253,10 +1438,18 @@ class Component extends Controller
     {
         $serial = $request->input('searchValue');
 
-        $data = DB::table('component')
+        $query = DB::table('component')
             ->select('component.*')
-            ->where('component.serial', $serial)
-            ->first();
+            ->whereRaw('LOWER(component.serial) = ?', [strtolower(trim($serial))]);
+
+        if (DB::getSchemaBuilder()->hasColumn('component', 'is_delete')) {
+            $query->where(function ($query) {
+                $query->where('component.is_delete', 0)
+                    ->orWhereNull('component.is_delete');
+            });
+        }
+
+        $data = $query->first();
 
         if (!$data) {
             return response()->json([
@@ -1265,7 +1458,7 @@ class Component extends Controller
             ]);
         }
 
-        if ((int)$data->status !== 1) {
+        if (!is_null($data->status) && (int)$data->status !== 1) {
             return response()->json([
                 'success' => 'failed',
                 'componentstatus' => $data->status
@@ -1302,16 +1495,18 @@ class Component extends Controller
     public function assetsbyid(Request $request)
     {
         $id            = $request->input('assetid');
+        $componentDeleteFilter = DB::getSchemaBuilder()->hasColumn('component', 'is_delete') ? 'and component.is_delete = 0' : '';
 
-        $data = DB::select("select component.*, supplier.name as supplier, brand.name as brand, asset_type.name as type 
-        from component left join supplier  
+        $data = DB::select("select component.*, supplier.name as supplier, brand.name as brand, asset_type.name as type
+        from component left join supplier
         on component.supplierid = supplier.id
-        left join brand 
+        left join brand
         on component.brandid = brand.id
-        left join component_assets 
+        left join component_assets
         on component.id = component_assets.componentid
         left join asset_type
         on component.typeid = asset_type.id where component_assets.assetid ='$id'
+        $componentDeleteFilter
         order by component.created_at desc");
         return Datatables::of($data)
             ->addColumn('avalaiblequantity', function ($single) {
@@ -1351,7 +1546,7 @@ class Component extends Controller
         $id            = $request->input('id');
 
         $data = DB::select("select component_assets.*, assets.name as assetname, component.name, component.serial, component.description, component.checkstatus, employees.fullname as efullname, receiver.fullname as rfullname, employees.mobile_number, department.name
-        from component_assets left join assets  
+        from component_assets left join assets
         on component_assets.assetid = assets.id left join component
         on component_assets.componentid = component.id left join employees
         on component_assets.employeeid = employees.id left join receiver
@@ -1395,6 +1590,7 @@ class Component extends Controller
         $groupedData = DB::table('component')
             ->select('name', 'groupid', DB::raw('MIN(id) as first_id'))
             ->whereNotNull('name')
+            ->where('is_delete', 0)
             ->groupBy('name', 'groupid')
             ->having(DB::raw('COUNT(*)'), '>', 1)
             ->get();
@@ -1431,17 +1627,14 @@ class Component extends Controller
         } else {
             $getfilename = DB::table('component')
                 ->where('id', '=', $id)
+                ->where('is_delete', 0)
                 ->first();
 
-            $delete          = DB::table('component')->where('id', $id)->delete();
-            $notdefaultimage = 'pic.png';
-            $filename        = $getfilename->picture;
-
-            if ($filename != $notdefaultimage) {
-                $deleteimage = File::delete('upload/assets/' . $getfilename->picture);
-            }
+            $delete          = DB::table('component')->where('id', $id)->where('is_delete', 0)
+                ->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
             if ($delete) {
                 $res['message'] = 'success';
+                $this->auditTrail('Issuance', 'Delete', 'Deleted component ID: '.$id.'.');
             } else {
                 $res['message'] = 'failed';
             }
@@ -1458,7 +1651,7 @@ class Component extends Controller
 
     public function generateproductcode()
     {
-        $lastid = DB::table('component')->orderBy('id', 'desc')->first();
+        $lastid = DB::table('component')->where('is_delete', 0)->orderBy('id', 'desc')->first();
 
         if ($lastid) {
             $res['success'] = 'success';
@@ -1469,4 +1662,3 @@ class Component extends Controller
         return response($res);
     }
 }
-

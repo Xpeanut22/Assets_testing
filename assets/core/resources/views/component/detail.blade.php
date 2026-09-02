@@ -424,24 +424,37 @@
             },
             dataType: "JSON",
             success: function(data) {
-                $(".componentname").html(data.message.componentname);
-                $(".serial").html(data.message.serial);
-                $(".type").html(data.message.type);
-                $(".assetstatus").html(data.assetstatus);
-                $(".componenttype").html(data.message.type);
-                $(".componentserial").html(data.message.serial);
-                $(".componentbrand").html(data.message.brand);
-                $(".componentquantity").html(data.message.quantity);
-                $(".componentpurchasedate").html(data.assetpurchasedate);
-                $(".componentcost").html(data.assetcost);
-                $(".componentwarranty").html(data.message.warranty);
-                $(".componentlocation").html(data.message.location);
-                $(".componentsupplier").html(data.message.supplier);
-                $(".componentupdated").html(data.assetupdated_at);
-                $(".componentcreated").html(data.assetcreated_at);
-                $(".componentdescription").html(data.message.componentdescription);
+                if (!data || data.success === 'failed' || !data.message) {
+                    alert('Unable to load issuance item details.');
+                    return;
+                }
+
+                var item = data.message;
+                var showValue = function(value) {
+                    return value === undefined || value === null || value === '' ? '-' : value;
+                };
+
+                $(".componentname").html(showValue(item.componentname));
+                $(".serial").html(showValue(item.serial));
+                $(".type").html(showValue(item.type));
+                $(".assetstatus").html(showValue(data.assetstatus));
+                $(".componenttype").html(showValue(item.type));
+                $(".componentserial").html(showValue(item.serial));
+                $(".componentbrand").html(showValue(item.brand));
+                $(".componentquantity").html(showValue(item.quantity));
+                $(".componentpurchasedate").html(showValue(data.assetpurchasedate));
+                $(".componentcost").html(showValue(data.assetcost));
+                $(".componentwarranty").html(showValue(item.warranty));
+                $(".componentlocation").html(showValue(item.location));
+                $(".componentsupplier").html(showValue(item.supplier));
+                $(".componentupdated").html(showValue(data.assetupdated_at));
+                $(".componentcreated").html(showValue(data.assetcreated_at));
+                $(".componentdescription").html(showValue(item.componentdescription));
                 $(".assetbarcode").html(data.assetbarcode);
                 $(".componentimage").attr("src", data.assetimage);
+            },
+            error: function() {
+                alert('Unable to load issuance item details.');
             }
         });
 
@@ -527,6 +540,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     title: '<?php echo trans('lang.componentdetail'); ?>',
                     orientation: 'landscape',
+                    customize: standardPdfForm,
                     exportOptions: {
                         columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -542,6 +556,7 @@
                     title: '<?php echo trans('lang.componentdetail'); ?>',
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
+                    customize: standardPrintForm,
                     exportOptions: {
                         columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -691,6 +706,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     title: '<?php echo trans('lang.file_list '); ?>',
                     orientation: 'landscape',
+                    customize: standardPdfForm,
                     exportOptions: {
                         columns: [1, 2, 3]
                     },
@@ -705,6 +721,7 @@
                     title: '<?php echo trans('lang.file_list '); ?>',
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
+                    customize: standardPrintForm,
                     exportOptions: {
                         columns: [1, 2, 3]
                     }

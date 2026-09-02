@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\ReceiverModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Unit extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -36,8 +38,11 @@ class Unit extends Controller
      */
     public function getdata()
     {
+        $unitDeleteFilter = DB::getSchemaBuilder()->hasColumn('units', 'is_delete') ? 'where is_delete = 0' : '';
+
         $data = DB::select("select *
-        from units ");
+        from units
+        $unitDeleteFilter");
         return Datatables::of($data)
 
             ->addColumn('action', function ($accountsingle) {
@@ -54,7 +59,11 @@ class Unit extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('units')->get();
+        $query = DB::table('units');
+        if (DB::getSchemaBuilder()->hasColumn('units', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;
@@ -74,7 +83,7 @@ class Unit extends Controller
     {
         $id            = $request->input('id');
 
-        $data = DB::table('units')->where('id', $id)->first();
+        $data = DB::table('units')->where('id', $id)->where('is_delete', 0)->first();
 
         if ($data) {
             $res['success'] = 'success';
@@ -105,6 +114,7 @@ class Unit extends Controller
 
         $unitcheck = DB::table('units')
             ->where('unit', '=', $unit)
+            ->where('is_delete', 0)
             ->first();
 
         if ($unitcheck) {
@@ -113,13 +123,15 @@ class Unit extends Controller
 
             $data       = array(
                 'unit' => $unit,
-                'Description' => $description
+                'Description' => $description,
+                'is_delete' => 0
             );
 
             $insert     = DB::table('units')->insert($data);
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail('Utilities', 'Create', 'Created unit: '.$unit.'.', 'Unit', null, null, ['name' => $unit, 'description' => $description]);
             } else {
                 $res['message'] = 'failed';
             }
@@ -149,13 +161,15 @@ class Unit extends Controller
         $unitcheck = DB::table('units')
             ->where('unit', '=', $unit)
             ->where('id', '!=', $id)
+            ->where('is_delete', 0)
             ->first();
 
         if ($unitcheck) {
             $res['message'] = 'exist';
         } else {
+            $oldUnit = DB::table('units')->where('id', $id)->where('is_delete', 0)->first();
 
-            $update = DB::table('units')->where('id', $id)
+            $update = DB::table('units')->where('id', $id)->where('is_delete', 0)
                 ->update(
                     [
                         'unit'          => $unit,
@@ -165,6 +179,9 @@ class Unit extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $diff = $this->auditCalculateDiff($oldUnit, ['unit' => $unit, 'description' => $description], ['unit' => 'Name', 'description' => 'Description']);
+                $detailsText = 'Updated unit: '.$unit.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Unit', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -186,11 +203,13 @@ class Unit extends Controller
         //set delete if no assets to this user
 
         $id = $request->input('id');
+        $unit = DB::table('units')->where('id', $id)->where('is_delete', 0)->first();
 
-        $delete = DB::table('units')->where('id', $id)->delete();
+        $delete = DB::table('units')->where('id', $id)->where('is_delete', 0)->update(['is_delete' => 1]);
 
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Utilities', 'Delete', 'Deleted unit ID: '.$id.'.', 'Unit', $id, ['name' => $unit->unit ?? '-', 'description' => $unit->Description ?? '-'], null);
         } else {
             $res['success'] = 'failed';
         }

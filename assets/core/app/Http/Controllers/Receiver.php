@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\ReceiverModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Receiver extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct() {
 		
@@ -122,7 +124,7 @@ class Receiver extends Controller
             $res['message'] = 'exist';  
         }
         else{ 
-      
+          
           
                 $data       = array('fullname'=>$fullname, 
                             'email'=>$email,
@@ -140,7 +142,7 @@ class Receiver extends Controller
 
             if ( $insert ) {
                 $res['message'] = 'success';
-                
+                $this->auditTrail('Utilities', 'Create', 'Created receiver: '.$fullname.'.', 'Receiver', null, null, ['fullname' => $fullname, 'email' => $email, 'jobrole' => $jobrole]);
             } else{
                 $res['message'] = 'failed';
             }
@@ -171,7 +173,6 @@ class Receiver extends Controller
         $city           = $request->input( 'city' );
         $country        = $request->input( 'country' );
         $address        = $request->input( 'address' );
-        $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
       
         $emailcheck = DB::table('receiver')
@@ -184,6 +185,7 @@ class Receiver extends Controller
                 $res['message'] = 'exist';  
         } 
         else{
+            $oldReceiver = DB::table('receiver')->where('id', $id)->where('is_delete', 0)->first();
 
             $update = DB::table( 'receiver' )->where( 'id', $id )->where('is_delete', 0)
             ->update(
@@ -201,7 +203,9 @@ class Receiver extends Controller
 
             if ( $update ) {
                 $res['message'] = 'success';
-                
+                $diff = $this->auditCalculateDiff($oldReceiver, ['fullname' => $fullname, 'email' => $email, 'jobrole' => $jobrole, 'city' => $city], ['fullname' => 'Full Name', 'email' => 'Email', 'jobrole' => 'Job Role', 'city' => 'City']);
+                $detailsText = 'Updated receiver: '.$fullname.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Receiver', $id, $diff['old'], $diff['new']);
             } else{
                 $res['message'] = 'failed';
             }
@@ -222,11 +226,13 @@ class Receiver extends Controller
         //set delete if no assets to this user
 
         $id = $request->input( 'id' );
+        $receiver = DB::table('receiver')->where('id', $id)->where('is_delete', 0)->first();
       
         $delete = DB::table( 'receiver' )->where( 'id', $id )->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
 
         if ( $delete ) {
             $res['success'] = 'success';
+            $this->auditTrail('Utilities', 'Delete', 'Deleted receiver ID: '.$id.'.', 'Receiver', $id, ['fullname' => $receiver->fullname ?? '-', 'email' => $receiver->email ?? '-'], null);
         } else{
             $res['success'] = 'failed';
         }

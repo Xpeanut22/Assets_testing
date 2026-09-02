@@ -7,6 +7,7 @@ use App\AssetsVehicleModel;
 use Illuminate\Support\Facades\File;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -17,6 +18,25 @@ use Milon\Barcode\DNS2D;
 class AssetVehicle extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
+
+    private function officialFooterPath()
+    {
+        return resource_path('views/component/Munti_IssuanceForm_AMS/Munti_IssuanceForm_AMS/CGM FOOTER.png');
+    }
+
+    private function drawOfficialFooter($pdf, $height = 18)
+    {
+        $footer = $this->officialFooterPath();
+        if (!file_exists($footer)) {
+            return;
+        }
+
+        $pageWidth = $pdf->GetPageWidth();
+        $pageHeight = $pdf->GetPageHeight();
+        $y = max(0, $pageHeight - $height);
+        $pdf->Image($footer, 0, $y, $pageWidth, $height);
+    }
 
     public function __construct()
     {
@@ -29,6 +49,10 @@ class AssetVehicle extends Controller
 
     private function syncUnserviceableMaintenance($assetid, $createdBy, $date, $updated_at, $remarks = null)
     {
+        if ($createdBy === null || $createdBy === '' || $createdBy === '0' || $createdBy === 0) {
+            $createdBy = Auth::id() ?: Auth::user()->fullname;
+        }
+
         $hasMaintenanceDeleteColumn = DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete');
         $maintenanceQuery = DB::table('maintenance')
             ->where('assetid', $assetid)
@@ -299,6 +323,8 @@ class AssetVehicle extends Controller
         $pdf = new \FPDF('P', 'mm', 'Legal');
         $pdf->AddPage();
         $pdf->SetAutoPageBreak(false);
+        $this->drawOfficialFooter($pdf);
+        $pdf->SetTitle($formTitle . ' - ' . $vehicleName . ' (' . $history->assettag . ')');
 
         $pdf->SetFont('Arial', '', 8);
         $pdf->SetXY(0, 7);
@@ -461,9 +487,13 @@ class AssetVehicle extends Controller
         $yLine = $pdf->GetY() - 1;
         $pdf->Line(80, $yLine, 140, $yLine);
 
+        $safeVehicleName = preg_replace('/[^A-Za-z0-9\-_]+/', '_', $vehicleName);
+        $safeAssetTag = preg_replace('/[^A-Za-z0-9\-_]+/', '_', (string) $history->assettag);
+        $filename = $filenamePrefix . '_' . trim($safeVehicleName . '_' . $safeAssetTag, '_') . '.pdf';
+
         return response($pdf->Output('S'), 200)
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="' . $filenamePrefix . '_' . $history->id . '.pdf"');
+            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
     }
 
     public function borrowedform($id)
@@ -752,9 +782,9 @@ class AssetVehicle extends Controller
     public function getdata()
     {
         $data = DB::select("select assets.*, supplier.name as supplier, brand.name as brand, asset_type.name as type , location.name as location, ah.status as historystatus
-        from assets left join supplier 
+        from assets left join supplier
         on assets.supplierid = supplier.id
-        left join brand 
+        left join brand
         on assets.brandid = brand.id
         left join asset_type
         on assets.typeid = asset_type.id
@@ -817,9 +847,9 @@ class AssetVehicle extends Controller
 
         $data = DB::select("select asset_history.*, assets.name as assetname, IFNULL(employees.fullname, '-') as employeename, department.name as office, COALESCE(NULLIF(users.fullname, ''), '-') as fullname
 
-        from asset_history left join assets  
+        from asset_history left join assets
         on asset_history.assetid = assets.id
-        left join employees 
+        left join employees
         on asset_history.employeeid = employees.id
         left join department
         on employees.departmentid = department.id
@@ -861,7 +891,7 @@ class AssetVehicle extends Controller
     }
 
     /**
-     * get single data 
+     * get single data
      * @param integer $id
      * @return object
      */
@@ -1071,6 +1101,7 @@ class AssetVehicle extends Controller
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail('Asset Vehicle', 'Create', 'Created vehicle: '.$name.' ('.$assettag.').');
             } else {
                 $res['message'] = 'failed';
             }
@@ -1120,12 +1151,13 @@ class AssetVehicle extends Controller
         $created_at         = date("Y-m-d H:i:s");
         $updated_at         = date("Y-m-d H:i:s");
         $message = ['picture.mimes' => trans('lang.upload_error')];
+        $oldVehicle         = DB::table('assets')->where('id', $id)->first();
 
         $tagcheck = DB::table('assets')
             ->where('assettag', '=', $assettag)
             ->where('id', '!=', $id)
             ->first();
-            
+
 
         if ($tagcheck) {
             // dd($tagcheck);
@@ -1133,7 +1165,7 @@ class AssetVehicle extends Controller
             $res['message'] = 'sadness';
         } else {
 
-        
+
 
 
 
@@ -1208,6 +1240,49 @@ class AssetVehicle extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $labelMap = [
+                    'name' => 'Name',
+                    'assettag' => 'Asset Tag',
+                    'locationid' => 'Location ID',
+                    'supplierid' => 'Supplier ID',
+                    'brandid' => 'Brand ID',
+                    'typeid' => 'Type ID',
+                    'vehiclecategory' => 'Vehicle Category',
+                    'yearmodel' => 'Year Model',
+                    'yearacquired' => 'Year Acquired',
+                    'chassis' => 'Chassis',
+                    'engineno' => 'Engine No',
+                    'fueltype' => 'Fuel Type',
+                    'transmission' => 'Transmission',
+                    'purchasedate' => 'Purchase Date',
+                    'cost' => 'Cost',
+                    'warranty' => 'Warranty',
+                    'status' => 'Status',
+                    'description' => 'Description'
+                ];
+                $newData = [
+                    'name' => $name,
+                    'assettag' => $assettag,
+                    'locationid' => $locationid,
+                    'supplierid' => $supplierid,
+                    'brandid' => $brandid,
+                    'typeid' => $typeid,
+                    'vehiclecategory' => $vehiclecategory,
+                    'yearmodel' => $yearmodel,
+                    'yearacquired' => $yearacquired,
+                    'chassis' => $chassis,
+                    'engineno' => $engineno,
+                    'fueltype' => $fueltype,
+                    'transmission' => $transmission,
+                    'purchasedate' => $purchasedate,
+                    'cost' => $cost,
+                    'warranty' => $warranty,
+                    'status' => $status,
+                    'description' => $description
+                ];
+                $diff = $this->auditCalculateDiff($oldVehicle, $newData, $labelMap);
+                $detailsText = 'Updated vehicle: '.$name.' ('.$assettag.')' . ($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Asset Vehicle', 'Update', $detailsText, 'Asset Vehicle', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -1229,7 +1304,7 @@ class AssetVehicle extends Controller
         $assetid        = $request->input('assetid');
         $employeeid     = $request->input('employeeid');
         $date           = $request->input('checkoutdate');
-        $vehiclestatus  = $request->input('vehiclestatus');
+        $vehiclestatus  = strtolower(trim((string) $request->input('vehiclestatus')));
         $remarks        = $request->input('remarks');
         $controlno      = $request->input('controlno') ?: $this->generateVehicleTripControlNumber();
         $tripTicket     = $this->vehicleTripTicketData($request);
@@ -1280,7 +1355,7 @@ class AssetVehicle extends Controller
                 ->update($assetUpdate);
 
             if ($vehiclestatus === 'unserviceable') {
-                $this->syncUnserviceableMaintenance($assetid, $employeeid, $date, $updated_at, $remarks);
+                $this->syncUnserviceableMaintenance($assetid, $receiverby, $date, $updated_at, $remarks);
             } elseif ($vehiclestatus === 'serviceable') {
                 $this->closeUnserviceableMaintenance($assetid, $date, $updated_at);
             }
@@ -1288,6 +1363,9 @@ class AssetVehicle extends Controller
             $res['success'] = 'success';
             $res['id'] = $insertId;
             $res['print_url'] = ($vehiclestatus === 'borrowed') ? url('assetvehiclelist/borrowedform/' . $insertId) : null;
+            $asset = DB::table('assets')->where('id', $assetid)->first();
+            $actionLabel = ($vehiclestatus === 'borrowed') ? 'Borrowed' : (($vehiclestatus === 'returned') ? 'Return' : ucfirst($vehiclestatus));
+            $this->auditTrail('Asset Vehicle', $actionLabel, $actionLabel.' vehicle: '.($asset ? $asset->name.' ('.$asset->assettag.')' : 'vehicle ID '.$assetid).'.');
         } else {
             $res['success'] = 'failed';
         }
@@ -1309,7 +1387,7 @@ class AssetVehicle extends Controller
         $assetid        = $request->input('assetid');
         $employeeid     = $request->input('employeeid1');
         $date           = $request->input('checkindate');
-        $vehiclestatus  = $request->input('vehiclestatus');
+        $vehiclestatus  = strtolower(trim((string) $request->input('vehiclestatus')));
         $remarks        = $request->input('remarks');
         $returnTrip     = $this->vehicleReturnTripTicketData($request);
         $status         = '2';
@@ -1363,13 +1441,16 @@ class AssetVehicle extends Controller
                 ->update($assetUpdate);
 
             if ($vehiclestatus === 'unserviceable') {
-                $this->syncUnserviceableMaintenance($assetid, $employeeid, $date, $updated_at, $remarks);
+                $this->syncUnserviceableMaintenance($assetid, $receiverby, $date, $updated_at, $remarks);
             } elseif ($vehiclestatus === 'serviceable') {
                 $this->closeUnserviceableMaintenance($assetid, $date, $updated_at);
             }
             $res['success'] = 'success';
             $res['id'] = $insertId;
             $res['print_url'] = ($vehiclestatus === 'returned') ? url('assetvehiclelist/returnform/' . $insertId) : null;
+            $asset = DB::table('assets')->where('id', $assetid)->first();
+            $actionLabel = ($vehiclestatus === 'returned') ? 'Return' : (($vehiclestatus === 'borrowed') ? 'Borrowed' : ucfirst($vehiclestatus));
+            $this->auditTrail('Asset Vehicle', $actionLabel, ($actionLabel === 'Return' ? 'Returned' : $actionLabel).' vehicle: '.($asset ? $asset->name.' ('.$asset->assettag.')' : 'vehicle ID '.$assetid).'.');
         } else {
             $res['success'] = 'failed';
         }
@@ -1407,6 +1488,7 @@ class AssetVehicle extends Controller
 
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Asset Vehicle', 'Delete', 'Deleted vehicle ID: '.$id.'.');
         } else {
             $res['success'] = 'failed';
         }

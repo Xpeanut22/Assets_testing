@@ -114,6 +114,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.maintenancereport');?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5,6, 7]
                 },
@@ -128,6 +129,7 @@
                 title: '<?php echo trans('lang.maintenancereport');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5,6, 7]
                 }

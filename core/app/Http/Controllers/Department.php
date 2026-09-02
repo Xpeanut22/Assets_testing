@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\DepartmentModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -15,6 +16,7 @@ use Auth;
 class Department extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct() {
 		
@@ -35,6 +37,9 @@ class Department extends Controller
 	 */
     public function getdata(){
         $data = DB::table('department')->select(['department.*']);
+        if (DB::getSchemaBuilder()->hasColumn('department', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
 		return Datatables::of($data)
 		->addColumn( 'action', function ( $accountsingle ) {
             return '<a href="#" id="btnedit" customdata='.$accountsingle->id.' class="btn btn-sm btn-primary" data-toggle="modal" data-target="#edit"><i class="fa fa-pencil"></i> '. trans('lang.edit').'</a>
@@ -47,7 +52,11 @@ class Department extends Controller
 	 * @return object
 	 */
     public function getrows(){
-        $data = DB::table('department')->get();
+        $query = DB::table('department');
+        if (DB::getSchemaBuilder()->hasColumn('department', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ( $data ) {
 			$res['success'] = true;
 			$res['message']= $data;
@@ -64,7 +73,7 @@ class Department extends Controller
     public function byid( Request $request ) {
         $id            = $request->input( 'id' );
 
-        $data = DB::table('department')->where('id', $id)->first();
+        $data = DB::table('department')->where('id', $id)->where('is_delete', 0)->first();
         
         if ( $data ) {
 			$res['success'] = 'success';
@@ -88,12 +97,12 @@ class Department extends Controller
         $description    = $request->input( 'description' );
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
-        $data           = array('name'=>$name, 'description'=>$description,'created_at'=>$created_at, 'updated_at'=>$updated_at);
+        $data           = array('name'=>$name, 'description'=>$description,'is_delete'=>0,'created_at'=>$created_at, 'updated_at'=>$updated_at);
 		$insert         = DB::table( 'department' )->insert( $data );
 
 		if ( $insert ) {
 			$res['success'] = 'success';
-			
+			$this->auditTrail('Utilities', 'Create', 'Created department: '.$name.'.', 'Department', null, null, ['name' => $name, 'description' => $description]);
         } else{
             $res['success'] = 'failed';
         }
@@ -112,10 +121,11 @@ class Department extends Controller
         $id             = $request->input( 'id' );
         $name           = $request->input( 'name' );
         $description    = $request->input( 'description' );
-        $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
 
-		$update = DB::table( 'department' )->where( 'id', $id )
+        $oldDepartment = DB::table('department')->where('id', $id)->where('is_delete', 0)->first();
+
+		$update = DB::table( 'department' )->where( 'id', $id )->where('is_delete', 0)
 		->update(
 			[
 			'name'          => $name,
@@ -126,7 +136,9 @@ class Department extends Controller
         
         if ( $update ) {
 			$res['success'] = 'success';
-			
+			$diff = $this->auditCalculateDiff($oldDepartment, ['name' => $name, 'description' => $description], ['name' => 'Name', 'description' => 'Description']);
+			$detailsText = 'Updated department: '.$name.($diff['details'] ? ":\n" . $diff['details'] : '');
+			$this->auditTrail('Utilities', 'Update', $detailsText, 'Department', $id, $diff['old'], $diff['new']);
         } else{
             $res['success'] = 'failed';
         }
@@ -143,9 +155,11 @@ class Department extends Controller
 
 	public function delete( Request $request ) {
 		$id = $request->input( 'id' );
-		$delete = DB::table( 'department' )->where( 'id', $id )->delete();
+		$department = DB::table('department')->where('id', $id)->where('is_delete', 0)->first();
+		$delete = DB::table( 'department' )->where( 'id', $id )->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
             if ( $delete ) {
                 $res['success'] = 'success';
+                $this->auditTrail('Utilities', 'Delete', 'Deleted department ID: '.$id.'.', 'Department', $id, ['name' => $department->name ?? '-', 'description' => $department->description ?? '-'], null);
             } else{
                 $res['success'] = 'failed';
             }

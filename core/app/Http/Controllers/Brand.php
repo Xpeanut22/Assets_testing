@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\BrandModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Brand extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct() {
 		
@@ -34,6 +36,9 @@ class Brand extends Controller
 	 */
     public function getdata(){
         $data = DB::table('brand')->select(['brand.*']);
+        if (DB::getSchemaBuilder()->hasColumn('brand', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
 		return Datatables::of($data)
 		->addColumn( 'action', function ( $accountsingle ) {
             return '<a href="#" id="btnedit" customdata='.$accountsingle->id.' class="btn btn-sm btn-primary" data-toggle="modal" data-target="#edit"><i class="fa fa-pencil"></i> '. trans('lang.edit').'</a>
@@ -55,9 +60,11 @@ class Brand extends Controller
     // }
 
     public function getrows() {
-        $data = DB::table('brand')
-                  ->where('type', 'tools') 
-                  ->get();
+        $query = DB::table('brand')->where('type', 'tools');
+        if (DB::getSchemaBuilder()->hasColumn('brand', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
     
         $res = ['success' => false, 'message' => 'No data found'];
     
@@ -70,9 +77,11 @@ class Brand extends Controller
     }
 
     public function listofvehiclebrand() {
-        $data = DB::table('brand')
-                  ->where('type', 'vehicle') 
-                  ->get();
+        $query = DB::table('brand')->where('type', 'vehicle');
+        if (DB::getSchemaBuilder()->hasColumn('brand', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
     
         $res = ['success' => false, 'message' => 'No data found'];
     
@@ -93,7 +102,7 @@ class Brand extends Controller
     public function byid( Request $request ) {
         $id            = $request->input( 'id' );
 
-        $data = DB::table('brand')->where('id', $id)->first();
+        $data = DB::table('brand')->where('id', $id)->where('is_delete', 0)->first();
         
         if ( $data ) {
 			$res['success'] = 'success';
@@ -118,12 +127,12 @@ class Brand extends Controller
         $type    = $request->input( 'brandtype' );
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
-        $data           = array('name'=>$name, 'description'=>$description,'type'=>$type,'created_at'=>$created_at, 'updated_at'=>$updated_at);
+        $data           = array('name'=>$name, 'description'=>$description,'type'=>$type,'is_delete'=>0,'created_at'=>$created_at, 'updated_at'=>$updated_at);
 		$insert         = DB::table( 'brand' )->insert( $data );
 
 		if ( $insert ) {
 			$res['success'] = 'success';
-			
+			$this->auditTrail('Utilities', 'Create', 'Created brand: '.$name.'.', 'Brand', null, null, ['name' => $name, 'description' => $description, 'type' => $type]);
         } else{
             $res['success'] = 'failed';
         }
@@ -143,10 +152,11 @@ class Brand extends Controller
         $name           = $request->input( 'name' );
         $description    = $request->input( 'description' );
         $type    = $request->input( 'brandtype' );
-        $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
 
-		$update = DB::table( 'brand' )->where( 'id', $id )
+        $oldBrand = DB::table('brand')->where('id', $id)->where('is_delete', 0)->first();
+
+		$update = DB::table( 'brand' )->where( 'id', $id )->where('is_delete', 0)
 		->update(
 			[
 			'name'          => $name,
@@ -157,7 +167,9 @@ class Brand extends Controller
         
         if ( $update ) {
 			$res['success'] = 'success';
-			
+			$diff = $this->auditCalculateDiff($oldBrand, ['name' => $name, 'description' => $description, 'type' => $type], ['name' => 'Name', 'description' => 'Description', 'type' => 'Type']);
+			$detailsText = 'Updated brand: '.$name.($diff['details'] ? ":\n" . $diff['details'] : '');
+			$this->auditTrail('Utilities', 'Update', $detailsText, 'Brand', $id, $diff['old'], $diff['new']);
         } else{
             $res['success'] = 'failed';
         }
@@ -174,9 +186,11 @@ class Brand extends Controller
 
 	public function delete( Request $request ) {
 		$id = $request->input( 'id' );
-		$delete = DB::table( 'brand' )->where( 'id', $id )->delete();
+		$brand = DB::table('brand')->where('id', $id)->where('is_delete', 0)->first();
+		$delete = DB::table( 'brand' )->where( 'id', $id )->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
             if ( $delete ) {
                 $res['success'] = 'success';
+                $this->auditTrail('Utilities', 'Delete', 'Deleted brand ID: '.$id.'.', 'Brand', $id, ['name' => $brand->name ?? '-', 'description' => $brand->description ?? '-', 'type' => $brand->type ?? '-'], null);
             } else{
                 $res['success'] = 'failed';
             }

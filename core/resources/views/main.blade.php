@@ -18,6 +18,155 @@
     <link rel="stylesheet" href="{{ asset('css/datepicker.css') }}">
     <link rel="stylesheet" href="{{ asset('css/select2.min.css')}}" type="text/css">
     <!-- <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />     -->
+    <style>
+        .dt-buttons.btn-group {
+            display: inline-flex;
+            align-items: center;
+            overflow: hidden;
+            border-radius: 6px;
+            box-shadow: none;
+        }
+
+        .dt-buttons.btn-group .btn,
+        .dt-buttons .dt-button {
+            height: 30px;
+            min-width: 58px;
+            margin: 0 !important;
+            padding: 6px 12px !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: #003f9e !important;
+            color: #fff !important;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 18px;
+            box-shadow: none !important;
+        }
+
+        .dt-buttons.btn-group .btn:first-child,
+        .dt-buttons .dt-button:first-child {
+            border-top-left-radius: 6px !important;
+            border-bottom-left-radius: 6px !important;
+        }
+
+        .dt-buttons.btn-group .btn:last-child,
+        .dt-buttons .dt-button:last-child {
+            border-top-right-radius: 6px !important;
+            border-bottom-right-radius: 6px !important;
+        }
+
+        .dt-buttons.btn-group .btn:hover,
+        .dt-buttons.btn-group .btn:focus,
+        .dt-buttons .dt-button:hover,
+        .dt-buttons .dt-button:focus {
+            background: #00368a !important;
+            color: #fff !important;
+            outline: none !important;
+        }
+
+        .dt-buttons .fa {
+            margin-left: 4px;
+        }
+    </style>
+    <script>
+        function standardPdfForm(doc) {
+            var title = (doc.info && doc.info.title) || (doc.content && doc.content[0] && doc.content[0].text) || 'Report';
+            var today = new Date().toISOString().slice(0, 10);
+
+            doc.pageSize = 'LEGAL';
+            doc.pageOrientation = 'landscape';
+            doc.pageMargins = [24, 82, 24, 32];
+            doc.defaultStyle = doc.defaultStyle || {};
+            doc.defaultStyle.fontSize = 8;
+
+            doc.header = function() {
+                return {
+                    margin: [24, 8, 24, 0],
+                    stack: [
+                        { text: 'Republic of the Philippines', alignment: 'center', fontSize: 8 },
+                        { text: 'CITY GOVERNMENT OF MUNTINLUPA', alignment: 'center', bold: true, fontSize: 9 },
+                        { text: 'City of Muntinlupa', alignment: 'center', fontSize: 8 },
+                        { text: 'DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT', alignment: 'center', bold: true, fontSize: 9, margin: [0, 7, 0, 0] },
+                        { text: '(Formerly Muntinlupa City Disaster Risk Reduction Management Office)', alignment: 'center', fontSize: 8 },
+                        { text: 'Hall of Justice Compound, Resilience Building, Susana Heights, Tunasan, Muntinlupa City', alignment: 'center', fontSize: 8 },
+                        { text: 'Tel No.: 8925-43-82', alignment: 'center', fontSize: 8 },
+                        { canvas: [{ type: 'line', x1: 0, y1: 5, x2: 952, y2: 5, lineWidth: 1.3 }] },
+                        { columns: [{ text: '' }, { text: 'DATE: ' + today, alignment: 'right', bold: true, fontSize: 9 }], margin: [0, 5, 0, 0] },
+                        { text: title, alignment: 'center', bold: true, fontSize: 13, margin: [0, 8, 0, 0] }
+                    ]
+                };
+            };
+
+            doc.footer = function(currentPage, pageCount) {
+                return {
+                    columns: [
+                        { text: 'Muntinlupa Asset Management System', alignment: 'left', margin: [24, 0, 0, 0], fontSize: 8 },
+                        { text: 'Page ' + currentPage + ' of ' + pageCount, alignment: 'right', margin: [0, 0, 24, 0], fontSize: 8 }
+                    ]
+                };
+            };
+
+            doc.content = (doc.content || []).filter(function(item) {
+                return !(item && item.text === title);
+            });
+
+            doc.content.forEach(function(item) {
+                if (item.table) {
+                    item.layout = {
+                        hLineWidth: function() { return 0.5; },
+                        vLineWidth: function() { return 0.5; },
+                        hLineColor: function() { return '#000'; },
+                        vLineColor: function() { return '#000'; },
+                        paddingLeft: function() { return 4; },
+                        paddingRight: function() { return 4; },
+                        paddingTop: function() { return 4; },
+                        paddingBottom: function() { return 4; }
+                    };
+                }
+            });
+
+            doc.styles = doc.styles || {};
+            doc.styles.tableHeader = doc.styles.tableHeader || {};
+            doc.styles.tableHeader.fillColor = '#2596be';
+            doc.styles.tableHeader.color = '#000';
+            doc.styles.tableHeader.bold = true;
+            doc.styles.tableHeader.alignment = 'center';
+        }
+
+        function standardPrintForm(win) {
+            var title = $(win.document.body).find('h1').first().text() || document.title || 'Report';
+            var today = new Date().toISOString().slice(0, 10);
+            $(win.document.head).append(
+                '<style>' +
+                    '@page{size:legal landscape;margin:12mm}' +
+                    'body{font-family:Arial,sans-serif;color:#000}' +
+                    '.print-form-header{text-align:center;margin-bottom:18px}' +
+                    '.print-form-header .agency{font-weight:700;font-size:13px}' +
+                    '.print-form-header .line{border-top:3px solid #000;border-bottom:1px solid #000;height:3px;margin:10px 0}' +
+                    '.print-form-title{font-weight:700;font-size:18px;margin:12px 0;text-transform:uppercase}' +
+                    '.print-form-date{text-align:right;font-weight:700;margin-top:6px}' +
+                    'table{border-collapse:collapse!important;width:100%!important;font-size:11px!important}' +
+                    'table th{background:#2596be!important;color:#000!important;text-align:center!important}' +
+                    'table th,table td{border:1px solid #000!important;padding:5px!important}' +
+                '</style>'
+            );
+            $(win.document.body).prepend(
+                '<div class="print-form-header">' +
+                    '<div>Republic of the Philippines</div>' +
+                    '<div class="agency">CITY GOVERNMENT OF MUNTINLUPA</div>' +
+                    '<div>City of Muntinlupa</div>' +
+                    '<div class="agency" style="margin-top:8px">DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT</div>' +
+                    '<div>(Formerly Muntinlupa City Disaster Risk Reduction Management Office)</div>' +
+                    '<div>Hall of Justice Compound, Resilience Building, Susana Heights, Tunasan, Muntinlupa City</div>' +
+                    '<div>Tel No.: 8925-43-82</div>' +
+                    '<div class="line"></div>' +
+                    '<div class="print-form-date">DATE: ' + today + '</div>' +
+                    '<div class="print-form-title">' + title + '</div>' +
+                '</div>'
+            );
+            $(win.document.body).find('h1').first().remove();
+        }
+    </script>
     <!-- Script -->
     <script src="{{ asset('js/jquery-3.5.1.min.js')}}"></script>
     <!-- <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> -->
@@ -214,17 +363,17 @@
 
                 <li>
                     <a data-toggle="collapse" href="#settings"
-                        class="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'collapsed' }}"
-                        aria-expanded="{{Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}">
+                        class="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'collapsed' }}"
+                        aria-expanded="{{Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}">
                         <i class="ti-settings"></i>
                         <p><img width="25"
                                 src="<?php echo asset('images/icon-setting.png') ?>" />&nbsp;&nbsp;&nbsp;<?php echo trans('lang.settingmenu'); ?>
                         </p>
                     </a>
-                    <div class="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'collapse in' : 'collapse' }}"
+                    <div class="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'collapse in' : 'collapse' }}"
                         id="settings"
-                        aria-expanded="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}"
-                        style="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'height: 0px;' }}">
+                        aria-expanded="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}"
+                        style="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'height: 0px;' }}">
                         <ul class="nav">
 
 
@@ -239,6 +388,13 @@
                                 <a href="{{ URL::to( 'settinglist') }}">
                                     <span class="sidebar-mini"><i class="fa fa-angle-right"></i></span>
                                     <span class="sidebar-normal"><?php echo trans('lang.applicationmenu'); ?></span>
+                                </a>
+                            </li>
+
+                            <li class="{{ Request::is( 'settinglist/audittrail') ? 'active' : '' }}">
+                                <a href="{{ URL::to( 'settinglist/audittrail') }}">
+                                    <span class="sidebar-mini"><i class="fa fa-angle-right"></i></span>
+                                    <span class="sidebar-normal">Audit Trail</span>
                                 </a>
                             </li>
 
@@ -383,15 +539,15 @@
                         @if($user && $user->role == '1')
                         <li>
                             <a data-toggle="collapse" href="#settingsmob"
-                                class="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'collapsed' }}"
-                                aria-expanded="{{Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}">
+                                class="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'collapsed' }}"
+                                aria-expanded="{{Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}">
                                 <i class="ti-settings"></i>
                                 <p><?php echo trans('lang.settingmenu'); ?></p>
                             </a>
-                            <div class="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'collapse in' : 'collapse' }}"
+                            <div class="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'collapse in' : 'collapse' }}"
                                 id="settingsmob"
-                                aria-expanded="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}"
-                                style="{{ Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'height: 0px;' }}">
+                                aria-expanded="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? 'true' : 'false' }}"
+                                style="{{ Request::is( 'settinglist') || Request::is( 'settinglist/audittrail') || Request::is( 'settings/profile') || Request::is( 'settings/allusers') || Request::is( 'settings/application') ? '' : 'height: 0px;' }}">
                                 <ul class="nav">
                                     <li class="{{ Request::is( 'userlist') ? 'active' : '' }}">
                                         <a href="{{ URL::to( 'userlist') }}">
@@ -404,6 +560,12 @@
                                         <a href="{{ URL::to( 'settinglist') }}">
                                             <span class="sidebar-mini"><i class="fa fa-angle-right"></i></span>
                                             <span class="sidebar-normal"><?php echo trans('lang.applicationmenu'); ?></span>
+                                        </a>
+                                    </li>
+                                    <li class="{{ Request::is( 'settinglist/audittrail') ? 'active' : '' }}">
+                                        <a href="{{ URL::to( 'settinglist/audittrail') }}">
+                                            <span class="sidebar-mini"><i class="fa fa-angle-right"></i></span>
+                                            <span class="sidebar-normal">Audit Trail</span>
                                         </a>
                                     </li>
                                 </ul>

@@ -1,5 +1,15 @@
 @extends('main')
 @section('content')
+<style>
+    .dashboard-recent-table {
+        max-height: 360px;
+        overflow-y: auto;
+    }
+
+    .dashboard-recent-table table {
+        margin-bottom: 0;
+    }
+</style>
 
 <section class="">
     <div class="content p-4">
@@ -148,7 +158,7 @@
                         <h5 class="title text-center"><?php echo trans('lang.recentassetactivity');?><h5>
                     </div>
                     <div class="card-body ">
-                        <div class="table-responsive">
+                        <div class="table-responsive dashboard-recent-table">
                              <table id="recentassetactivity" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                 <thead>
                                     <tr>
@@ -183,7 +193,7 @@
                         <h5 class="title text-center"><?php echo trans('lang.recentcomponentactivity');?><h5>
                     </div>
                     <div class="card-body ">
-                        <div class="table-responsive">
+                        <div class="table-responsive dashboard-recent-table">
                              <table id="recentcomponentactivity" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                 <thead>
                                     <tr>
@@ -345,10 +355,11 @@ $(document).ready(function() {
         url: "{{ url('home/assetbystatus')}}",
         dataType: "json",
         success: function (data) {
+            console.log('Asset by status data:', data);
+            
             var status = [];
             var amount = [];
             var color = [];
-            var statusdata = [];
 
             var dynamicColors = function() {
                 var r = Math.floor(Math.random() * 255);
@@ -357,36 +368,62 @@ $(document).ready(function() {
                 return "rgb(" + r + "," + g + "," + b + ")";
             };
 
+            var statusText = function(status) {
+                if (status == 1) {
+                    return 'Ready to deploy';
+                } else if (status == 2) {
+                    return 'Pending';
+                } else if (status == 3) {
+                    return 'Archived';
+                } else if (status == 4) {
+                    return 'Broken';
+                } else if (status == 5) {
+                    return 'Lost';
+                } else if (status == 6) {
+                    return 'Unserviceable';
+                } else {
+                    return 'Unknown';
+                }
+            };
+
             for(var i in data) {
-                status.push(data[i].status);
+                status.push(statusText(data[i].status));
                 amount.push(data[i].amount);
                 color.push(dynamicColors());
             }
             
             var databystatus = document.getElementById("assetbystatus");
-            var bystatus = new Chart(databystatus, {
-                type: 'doughnut',
-                legendPosition: 'bottom',
-                data: {
-                    labels: status,
-                    datasets: [
-                    {
-                        label: "<?php echo trans('lang.status');?>",
-                        data: amount,
-                        backgroundColor: color,
-                        borderWidth: 1
-                    }
-                    ]
-                },
-                options: {
-                    legend: {
-                           position: 'bottom',
+            if (databystatus) {
+                var bystatus = new Chart(databystatus, {
+                    type: 'doughnut',
+                    legendPosition: 'bottom',
+                    data: {
+                        labels: status,
+                        datasets: [
+                        {
+                            label: "<?php echo trans('lang.status');?>",
+                            data: amount,
+                            backgroundColor: color,
+                            borderWidth: 1
+                        }
+                        ]
                     },
-                    
-                }
-            });
+                    options: {
+                        legend: {
+                               position: 'bottom',
+                        },
+                        
+                    }
+                });
+            } else {
+                console.error('Canvas element assetbystatus not found');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading asset by status:', error);
+            console.log('Status:', status);
         }
-    }); 
+    });
 
 });
 

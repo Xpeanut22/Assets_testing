@@ -7,6 +7,9 @@
             <div class="col-md-6">
                 <h3 class=""><?php echo trans('lang.app_setting');?></h3>
             </div>
+            <div class="col-md-6 text-right">
+                <a href="{{ URL::to('settinglist/audittrail') }}" class="btn btn-primary btn-sm">Audit Trail</a>
+            </div>
         </div>
         <div class="row">
             <div class="col-md-12">

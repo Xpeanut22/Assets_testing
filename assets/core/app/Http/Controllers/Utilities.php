@@ -7,6 +7,7 @@ use Yajra\Datatables\Datatables;
 use App\GoalModel;
 use App\SettingModel;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use Auth;
 use App;
@@ -16,6 +17,25 @@ class Utilities extends Controller
 {
 
     use TraitSettings;
+    use TraitAuditTrail;
+
+    private function officialFooterPath()
+    {
+        return resource_path('views/component/Munti_IssuanceForm_AMS/Munti_IssuanceForm_AMS/CGM FOOTER.png');
+    }
+
+    private function drawOfficialFooter($pdf, $height = 18)
+    {
+        $footer = $this->officialFooterPath();
+        if (!file_exists($footer)) {
+            return;
+        }
+
+        $pageWidth = $pdf->GetPageWidth();
+        $pageHeight = $pdf->GetPageHeight();
+        $y = max(0, $pageHeight - $height);
+        $pdf->Image($footer, 0, $y, $pageWidth, $height);
+    }
 
     public function __construct()
     {
@@ -64,6 +84,265 @@ class Utilities extends Controller
     public function allutilities()
     {
         return view('utilities.utilities');
+    }
+
+    private function utilityPrintConfigs()
+    {
+        return [
+            'assettype' => [
+                'title' => 'Asset Type List',
+                'table' => 'asset_type',
+                'columns' => [
+                    'Asset Type' => 'name',
+                    'Description' => 'description',
+                ],
+            ],
+            'brand' => [
+                'title' => 'Brand List',
+                'table' => 'brand',
+                'columns' => [
+                    'Brand Name' => 'name',
+                    'Description' => 'description',
+                    'Brand Type' => 'type',
+                ],
+            ],
+            'supplier' => [
+                'title' => 'Supplier List',
+                'table' => 'supplier',
+                'columns' => [
+                    'Supplier Name' => 'name',
+                    'Contact Person' => 'contact_person',
+                    'Phone' => 'phone',
+                    'Email' => 'email',
+                    'Address' => 'address',
+                ],
+            ],
+            'receiver' => [
+                'title' => 'Receiver List',
+                'table' => 'receiver',
+                'columns' => [
+                    'Full Name' => 'fullname',
+                    'Mobile No.' => 'mobile_number',
+                    'Email' => 'email',
+                    'Address' => 'address',
+                    'Description' => 'description',
+                ],
+            ],
+            'used' => [
+                'title' => 'Use of Equipment List',
+                'table' => 'used',
+                'columns' => [
+                    'Name' => 'name',
+                    'Description' => 'description',
+                ],
+            ],
+            'typeofid' => [
+                'title' => 'Type of I.D List',
+                'table' => 'typeofid',
+                'columns' => [
+                    'I.D Name' => 'name',
+                    'Description' => 'description',
+                ],
+            ],
+            'location' => [
+                'title' => 'Location List',
+                'table' => 'location',
+                'columns' => [
+                    'Location' => 'name',
+                    'Description' => 'description',
+                ],
+            ],
+            'department' => [
+                'title' => 'Department List',
+                'table' => 'department',
+                'columns' => [
+                    'Department' => 'name',
+                    'Description' => 'description',
+                ],
+            ],
+            'unit' => [
+                'title' => 'Unit List',
+                'table' => 'unit',
+                'columns' => [
+                    'Unit' => 'name',
+                    'Description' => 'description',
+                ],
+            ],
+            'category' => [
+                'title' => 'Category List',
+                'table' => 'category',
+                'columns' => [
+                    'Category' => 'category',
+                    'Description' => 'description',
+                ],
+            ],
+            'employee' => [
+                'title' => 'Client List',
+                'table' => 'employees',
+                'columns' => [
+                    'Full Name' => 'fullname',
+                    'Email' => 'email',
+                    'Mobile No.' => 'mobile_number',
+                    'Job Role' => 'jobrole',
+                    'Department' => 'departmentname',
+                    'City' => 'city',
+                ],
+                'joins' => function ($query) {
+                    return $query->leftJoin('department', 'department.id', '=', 'employees.departmentid')
+                        ->addSelect('department.name as departmentname');
+                },
+            ],
+        ];
+    }
+
+    private function utilityPdfFit($pdf, $value, $width)
+    {
+        $value = preg_replace('/\s+/', ' ', trim((string) $value));
+        if ($value === '') {
+            return '-';
+        }
+
+        $maxWidth = max(1, $width - 2);
+        if ($pdf->GetStringWidth($value) <= $maxWidth) {
+            return $value;
+        }
+
+        while (strlen($value) > 0 && $pdf->GetStringWidth($value . '...') > $maxWidth) {
+            $value = substr($value, 0, -1);
+        }
+
+        return trim($value) . '...';
+    }
+
+    private function drawUtilityPdfHeader($pdf, $title)
+    {
+        $pdf->AddPage();
+        $this->drawOfficialFooter($pdf);
+        $pageWidth = $pdf->GetPageWidth();
+        $muntiLogo = app_path('fpdf/muntilogo.png');
+        $ddrmLogo = app_path('fpdf/drlogo.png');
+
+        if (file_exists($muntiLogo)) {
+            $pdf->Image($muntiLogo, 16, 5, 22, 22);
+        }
+        if (file_exists($ddrmLogo)) {
+            $pdf->Image($ddrmLogo, $pageWidth - 38, 5, 22, 22);
+        }
+
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->SetXY(0, 7);
+        $pdf->Cell($pageWidth, 4, 'Republic of the Philippines', 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->Cell($pageWidth, 4, 'CITY GOVERNMENT OF MUNTINLUPA', 0, 1, 'C');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->Cell($pageWidth, 4, 'City of Muntinlupa', 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 8);
+        $pdf->Cell($pageWidth, 4, 'DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT', 0, 1, 'C');
+        $pdf->SetFont('Arial', '', 8);
+        $pdf->Cell($pageWidth, 4, '(Formerly Muntinlupa City Disaster Risk Reduction Management Office)', 0, 1, 'C');
+        $pdf->Cell($pageWidth, 4, 'Hall of Justice Compound, Resilience Building, Susana Heights, Tunasan, Muntinlupa City', 0, 1, 'C');
+        $pdf->Cell($pageWidth, 4, 'Tel No.: 8925-43-82', 0, 1, 'C');
+
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line(12, 38, $pageWidth - 12, 38);
+        $pdf->Line(12, 40, $pageWidth - 12, 40);
+
+        $pdf->SetFont('Arial', 'B', 9);
+        $pdf->SetXY($pageWidth - 72, 47);
+        $pdf->Cell(14, 5, 'DATE:', 0, 0, 'R');
+        $pdf->Cell(30, 5, date('Y-m-d'), 'B', 0, 'C');
+
+        $pdf->SetFont('Arial', 'B', 14);
+        $pdf->SetXY(0, 60);
+        $pdf->Cell($pageWidth, 6, strtoupper($title), 0, 1, 'C');
+
+        return 76;
+    }
+
+    public function printutility($type)
+    {
+        if (!class_exists('\FPDF')) {
+            require_once app_path('fpdf/fpdf.php');
+        }
+
+        $configs = $this->utilityPrintConfigs();
+        if (!isset($configs[$type])) {
+            abort(404);
+        }
+
+        $config = $configs[$type];
+        $this->auditTrail('Utilities', 'Print', 'Printed utility list: '.$config['title'].'.', 'Utilities', $type);
+        $columns = $config['columns'];
+        $orientation = count($columns) > 4 ? 'L' : 'P';
+        $pdf = new \FPDF($orientation, 'mm', 'A4');
+        $pdf->SetAutoPageBreak(false);
+
+        $table = $config['table'];
+        $select = [$table . '.*'];
+        $query = DB::table($table)->select($select);
+        if (isset($config['joins']) && is_callable($config['joins'])) {
+            $query = $config['joins']($query);
+        }
+
+        if (DB::getSchemaBuilder()->hasColumn($table, 'is_delete')) {
+            $query->where(function ($query) use ($table) {
+                $query->where($table . '.is_delete', 0)->orWhereNull($table . '.is_delete');
+            });
+        }
+
+        if (DB::getSchemaBuilder()->hasColumn($table, 'created_at')) {
+            $query->orderBy($table . '.created_at', 'desc');
+        } elseif (DB::getSchemaBuilder()->hasColumn($table, 'name')) {
+            $query->orderBy($table . '.name');
+        }
+
+        $rows = $query->get();
+        $y = $this->drawUtilityPdfHeader($pdf, $config['title']);
+        $pageWidth = $pdf->GetPageWidth();
+        $usableWidth = $pageWidth - 20;
+        $noWidth = 12;
+        $dataWidth = ($usableWidth - $noWidth) / max(1, count($columns));
+
+        $drawTableHeader = function () use ($pdf, $columns, $noWidth, $dataWidth, &$y) {
+            $pdf->SetFillColor(41, 158, 190);
+            $pdf->SetFont('Arial', 'B', 8);
+            $pdf->SetXY(10, $y);
+            $pdf->Cell($noWidth, 8, 'No.', 1, 0, 'C', true);
+            foreach (array_keys($columns) as $header) {
+                $pdf->Cell($dataWidth, 8, $header, 1, 0, 'C', true);
+            }
+            $pdf->Ln();
+            $y += 8;
+        };
+
+        $drawTableHeader();
+        foreach ($rows as $index => $row) {
+            if ($y + 8 > ($pdf->GetPageHeight() - 12)) {
+                $pdf->AddPage();
+                $y = 12;
+                $drawTableHeader();
+            }
+
+            $pdf->SetFont('Arial', '', 8);
+            $pdf->SetXY(10, $y);
+            $pdf->Cell($noWidth, 8, ($index + 1) . '.', 1, 0, 'C');
+            foreach ($columns as $field) {
+                $value = isset($row->{$field}) ? $row->{$field} : '-';
+                $pdf->Cell($dataWidth, 8, $this->utilityPdfFit($pdf, $value, $dataWidth), 1, 0, 'L');
+            }
+            $pdf->Ln();
+            $y += 8;
+        }
+
+        if ($rows->isEmpty()) {
+            $pdf->SetXY(10, $y);
+            $pdf->Cell($usableWidth, 8, 'No records found.', 1, 1, 'C');
+        }
+
+        $filename = strtolower(str_replace(' ', '_', $config['title'])) . '.pdf';
+        return response($pdf->Output('S'), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
     }
 
 

@@ -325,8 +325,8 @@
                             <div class="form-group col-md-12 mb-0">
                                 <label>Start Date</label>
                                 <div class="input-group mb-0">
-                                    <input class="form-control" readonly required placeholder="Please select date"
-                                        id="editstartdate" name="editstartdate" type="datetime-local">
+                                    <input class="form-control" required placeholder="Please select date"
+                                        id="editstartdate" name="startdate" type="datetime-local">
                                     <span class="input-group-addon border-1" id="editdate"><i
                                             class="fa fa-calendar"></i></span>
                                 </div>
@@ -337,7 +337,7 @@
                                 <label>End Date</label>
                                 <div class="input-group mb-0">
                                     <input class="form-control" required placeholder="Please select date"
-                                        id="editstartdate" name="editenddate" type="datetime-local">
+                                        id="editenddate" name="enddate" type="datetime-local">
                                     <span class="input-group-addon border-1" id="editdate"><i
                                             class="fa fa-calendar"></i></span>
                                 </div>
@@ -425,7 +425,7 @@
             var minutes = String(today.getMinutes()).padStart(2, '0');
             var seconds = String(today.getSeconds()).padStart(2, '0');
 
-            var formattedDateTime = year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+            var formattedDateTime = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
 
             // Set the value of the checkindate input field
             $('#startdate').val(formattedDateTime);
@@ -503,7 +503,7 @@
         });
 
 
-        $('#data').DataTable({
+        var maintenanceTable = $('#data').DataTable({
 
             ajax: "{{ url('maintenance')}}",
 
@@ -568,31 +568,37 @@
                     }
                 },
                 {
-                    extend: 'pdf',
                     text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                     className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.maintenance_list'); ?>',
-                    orientation: 'landscape',
-                    exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6]
-                    },
-                    customize: function(doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-                        doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                            .join('*').split('');
+                    action: function() {
+                        openMaintenanceListPdf();
                     }
                 },
                 {
-                    extend: 'print',
-                    title: '<?php echo trans('lang.maintenance_list'); ?>',
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
-                    exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6]
+                    customize: standardPrintForm,
+                    action: function() {
+                        openMaintenanceListPdf();
                     }
                 }
             ]
         });
+
+        function clearMaintenanceTableSearch() {
+            maintenanceTable.search('').draw();
+            $('#data_filter input')
+                .val('')
+                .attr('autocomplete', 'off')
+                .attr('name', 'maintenance_table_search_' + Date.now());
+        }
+        clearMaintenanceTableSearch();
+        setTimeout(clearMaintenanceTableSearch, 100);
+        setTimeout(clearMaintenanceTableSearch, 500);
+
+        function openMaintenanceListPdf() {
+            window.open("{{ url('/maintenancelist/print/maintenance-list') }}", '_blank');
+        }
 
         //add data
         $("#formadd").validate({
@@ -707,11 +713,30 @@
                         $("#editmamount").val(data.message.mamount);
                         $("#editreason_remarks").val(data.message.reason_remarks);
                         $("#edittype").val(data.message.type);
-                        $("#editstartdate").val(data.message.startdate);
-                        $("#editenddate").val(data.message.enddate);
+
+                        // Format dates for datetime-local input (YYYY-MM-DDTHH:MM)
+                        function formatForDateTimeLocal(dateStr) {
+                            if (!dateStr || dateStr === '0000-00-00 00:00:00' || dateStr === '0000-00-00') return '';
+                            // Replace space with T for datetime-local compatibility
+                            var formatted = String(dateStr).trim().replace(' ', 'T');
+                            // If still not valid, try parsing with Date
+                            var testDate = new Date(formatted);
+                            if (isNaN(testDate.getTime())) return '';
+                            // Return in YYYY-MM-DDTHH:MM format (without seconds for max compatibility)
+                            var d = new Date(formatted);
+                            var yyyy = d.getFullYear();
+                            var mm = String(d.getMonth() + 1).padStart(2, '0');
+                            var dd = String(d.getDate()).padStart(2, '0');
+                            var hh = String(d.getHours()).padStart(2, '0');
+                            var min = String(d.getMinutes()).padStart(2, '0');
+                            return yyyy + '-' + mm + '-' + dd + 'T' + hh + ':' + min;
+                        }
+
+                        $("#editstartdate").val(formatForDateTimeLocal(data.message.startdate));
+                        $("#editenddate").val(formatForDateTimeLocal(data.message.enddate));
                     }
                 });
-                $('#edit').modal('show');
+                $("#passwordcontent").hide();
                 $("#editcontent").css('display', 'block');
                 targetModalEvent = null;
             }
@@ -744,7 +769,7 @@
                     }
                 });
 
-                $('#delete').modal('show');
+                $("#passwordcontent1").hide();
                 $("#deletecontent").css('display', 'block');
                 targetModalEvent = null;
             }
@@ -770,7 +795,6 @@
 
                     } else {
                         alert("Password validated");
-                        $(".passwordcontent").css('display', 'none');
                         if (eventHolder == 'edit') {
                             showEditModal();
                         } else if (eventHolder == 'delete') {
@@ -787,36 +811,39 @@
             });
         }
 
-        $("#edit #delete").on('hide.bs.modal', function() {
-            $("#editcontent").css('display', 'none');
-        });
-
-
         // modals goes here
         // edit data
         $('#edit').on('show.bs.modal', function(e) {
             x = 1;
-            // addmodal();
             eventHolder = 'edit';
-            // e.preventDefault();
-            // $("#edit").css('display', 'none');
-
             targetModalEvent = e;
-            // $("#password").modal("show");
-            $(".passwordcontent").css('display', 'block');
+            $("#adminpassword").val("");
+            $("#passwordcontent").show();
+            $("#editcontent").hide();
+        });
+
+        $('#edit').on('hidden.bs.modal', function() {
+            targetModalEvent = null;
+            $("#adminpassword").val("");
+            $("#passwordcontent").show();
+            $("#editcontent").hide();
         });
 
         //show delete data
         $('#delete').on('show.bs.modal', function(e) {
             x = 2;
-            // addmodal();
             eventHolder = 'delete';
-            // e.preventDefault();
-            // $("#edit").css('display', 'none');
-
             targetModalEvent = e;
-            // $("#password").modal("show");
-            $(".passwordcontent1").css('display', 'block');
+            $("#adminpassword1").val("");
+            $("#passwordcontent1").show();
+            $("#deletecontent").hide();
+        });
+
+        $('#delete').on('hidden.bs.modal', function() {
+            targetModalEvent = null;
+            $("#adminpassword1").val("");
+            $("#passwordcontent1").show();
+            $("#deletecontent").hide();
         });
 
 

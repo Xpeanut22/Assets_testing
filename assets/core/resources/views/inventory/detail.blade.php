@@ -589,6 +589,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.maintenance_list ');?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5]
                 },
@@ -603,6 +604,7 @@
                 title: '<?php echo trans('lang.maintenance_list ');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5]
                 }
@@ -674,6 +676,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.component_list');?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4 ,5]
                 },
@@ -688,6 +691,7 @@
                 title: '<?php echo trans('lang.component_list');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4 ,5]
                 }
@@ -764,6 +768,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.history_list');?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5, 6 ]
 
@@ -786,6 +791,7 @@
                 title: 'History',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5, 6 ]
 
@@ -855,6 +861,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.file_list ');?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [1, 2, 3]
                 },
@@ -869,6 +876,7 @@
                 title: '<?php echo trans('lang.file_list ');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [1, 2, 3]
                 }

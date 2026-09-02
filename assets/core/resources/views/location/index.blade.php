@@ -131,7 +131,7 @@
             
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary" id="delete"><?php echo trans('lang.delete');?></button>
+                    <button type="submit" class="btn btn-primary" id="confirmdelete"><?php echo trans('lang.delete');?></button>
                     <button type="button" class="btn btn-default" data-dismiss="modal"><?php echo trans('lang.close');?></button>
                 </div>
             </form>   
@@ -187,30 +187,19 @@
                 }
             },
             {
-                extend: 'pdf',
                 text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                 className: 'btn btn-sm btn-fill btn-info ',
-                title: '<?php echo trans('lang.location_list');?>',
-                orientation: 'landscape',
-                exportOptions: {
-                    columns: [1, 2]
-                },
-                customize: function(doc) {
-                    doc.styles.tableHeader.alignment = 'left';
-                    doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                        .join('*').split('');
+                action: function() {
+                    window.open("{{ url('/utilities/print/location') }}", '_blank');
                 }
             },
             {
-                extend: 'print',
-                title: '<?php echo trans('lang.location_list');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
-                exportOptions: {
-                    columns: [1, 2]
+                action: function() {
+                    window.open("{{ url('/utilities/print/location') }}", '_blank');
                 }
-            }
-        ]
+            }]
     });
 
 

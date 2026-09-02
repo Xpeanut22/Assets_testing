@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\ReceiverModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Category extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -36,8 +38,11 @@ class Category extends Controller
      */
     public function getdata()
     {
+        $categoryDeleteFilter = DB::getSchemaBuilder()->hasColumn('category', 'is_delete') ? 'where is_delete = 0' : '';
+
         $data = DB::select("select *
-        from category ");
+        from category
+        $categoryDeleteFilter");
         return Datatables::of($data)
 
             ->addColumn('action', function ($accountsingle) {
@@ -54,7 +59,11 @@ class Category extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('category')->get();
+        $query = DB::table('category');
+        if (DB::getSchemaBuilder()->hasColumn('category', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;
@@ -74,7 +83,7 @@ class Category extends Controller
     {
         $id            = $request->input('id');
 
-        $data = DB::table('category')->where('id', $id)->first();
+        $data = DB::table('category')->where('id', $id)->where('is_delete', 0)->first();
 
         if ($data) {
             $res['success'] = 'success';
@@ -105,6 +114,7 @@ class Category extends Controller
 
         $categorycheck = DB::table('category')
             ->where('category', '=', $category)
+            ->where('is_delete', 0)
             ->first();
 
         if ($categorycheck) {
@@ -113,13 +123,15 @@ class Category extends Controller
 
             $data       = array(
                 'category' => $category,
-                'Description' => $description
+                'Description' => $description,
+                'is_delete' => 0
             );
 
             $insert     = DB::table('category')->insert($data);
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail('Utilities', 'Create', 'Created category: '.$category.'.', 'Category', null, null, ['category' => $category, 'description' => $description]);
             } else {
                 $res['message'] = 'failed';
             }
@@ -149,13 +161,15 @@ class Category extends Controller
         $categorycheck = DB::table('category')
             ->where('category', '=', $category)
             ->where('id', '!=', $id)
+            ->where('is_delete', 0)
             ->first();
 
         if ($categorycheck) {
             $res['message'] = 'exist';
         } else {
+            $oldCategory = DB::table('category')->where('id', $id)->where('is_delete', 0)->first();
 
-            $update = DB::table('category')->where('id', $id)
+            $update = DB::table('category')->where('id', $id)->where('is_delete', 0)
                 ->update(
                     [
                         'category'          => $category,
@@ -165,6 +179,9 @@ class Category extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $diff = $this->auditCalculateDiff($oldCategory, ['category' => $category, 'description' => $description], ['category' => 'Category', 'description' => 'Description']);
+                $detailsText = 'Updated category: '.$category.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Category', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -186,11 +203,13 @@ class Category extends Controller
         //set delete if no assets to this user
 
         $id = $request->input('id');
+        $category = DB::table('category')->where('id', $id)->where('is_delete', 0)->first();
 
-        $delete = DB::table('category')->where('id', $id)->delete();
+        $delete = DB::table('category')->where('id', $id)->where('is_delete', 0)->update(['is_delete' => 1]);
 
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Utilities', 'Delete', 'Deleted category ID: '.$id.'.', 'Category', $id, ['category' => $category->category ?? '-', 'description' => $category->Description ?? '-'], null);
         } else {
             $res['success'] = 'failed';
         }

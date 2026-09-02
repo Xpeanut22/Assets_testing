@@ -208,30 +208,19 @@
                 }
             },
             {
-                extend: 'pdf',
                 text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                 className: 'btn btn-sm btn-fill btn-info ',
-                title: '<?php echo trans('lang.brand_list');?>',
-                orientation: 'landscape',
-                exportOptions: {
-                    columns: [1, 2]
-                },
-                customize: function(doc) {
-                    doc.styles.tableHeader.alignment = 'left';
-                    doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                        .join('*').split('');
+                action: function() {
+                    window.open("{{ url('/utilities/print/brand') }}", '_blank');
                 }
             },
             {
-                extend: 'print',
-                title: '<?php echo trans('lang.brand_list');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
-                exportOptions: {
-                    columns: [1, 2]
+                action: function() {
+                    window.open("{{ url('/utilities/print/brand') }}", '_blank');
                 }
-            }
-        ]
+            }]
     });
 
 //add data

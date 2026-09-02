@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\ReceiverModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Used extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -36,8 +38,11 @@ class Used extends Controller
      */
     public function getdata()
     {
+        $usedDeleteFilter = DB::getSchemaBuilder()->hasColumn('used', 'is_delete') ? 'where is_delete = 0' : '';
+
         $data = DB::select("select *
-        from used ");
+        from used
+        $usedDeleteFilter");
         return Datatables::of($data)
 
             ->addColumn('action', function ($accountsingle) {
@@ -54,7 +59,11 @@ class Used extends Controller
      */
     public function getrows()
     {
-        $data = DB::table('used')->get();
+        $query = DB::table('used');
+        if (DB::getSchemaBuilder()->hasColumn('used', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ($data) {
             $res['success'] = true;
             $res['message'] = $data;
@@ -74,7 +83,7 @@ class Used extends Controller
     {
         $id            = $request->input('id');
 
-        $data = DB::table('used')->where('id', $id)->first();
+        $data = DB::table('used')->where('id', $id)->where('is_delete', 0)->first();
 
         if ($data) {
             $res['success'] = 'success';
@@ -105,6 +114,7 @@ class Used extends Controller
 
         $categorycheck = DB::table('used')
             ->where('used', '=', $used)
+            ->where('is_delete', 0)
             ->first();
 
         if ($categorycheck) {
@@ -113,13 +123,15 @@ class Used extends Controller
 
             $data       = array(
                 'used' => $used,
-                'Description' => $description
+                'Description' => $description,
+                'is_delete' => 0
             );
 
             $insert     = DB::table('used')->insert($data);
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail('Utilities', 'Create', 'Created use of equipment: '.$used.'.', 'Use of Equipment', null, null, ['name' => $used, 'description' => $description]);
             } else {
                 $res['message'] = 'failed';
             }
@@ -149,13 +161,15 @@ class Used extends Controller
         $categorycheck = DB::table('used')
             ->where('used', '=', $used)
             ->where('id', '!=', $id)
+            ->where('is_delete', 0)
             ->first();
 
         if ($categorycheck) {
             $res['message'] = 'exist';
         } else {
+            $oldUsed = DB::table('used')->where('id', $id)->where('is_delete', 0)->first();
 
-            $update = DB::table('used')->where('id', $id)
+            $update = DB::table('used')->where('id', $id)->where('is_delete', 0)
                 ->update(
                     [
                         'used'          => $used,
@@ -165,6 +179,9 @@ class Used extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $diff = $this->auditCalculateDiff($oldUsed, ['used' => $used, 'description' => $description], ['used' => 'Name', 'description' => 'Description']);
+                $detailsText = 'Updated use of equipment: '.$used.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Use of Equipment', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -186,11 +203,13 @@ class Used extends Controller
         //set delete if no assets to this user
 
         $id = $request->input('id');
+        $used = DB::table('used')->where('id', $id)->where('is_delete', 0)->first();
 
-        $delete = DB::table('used')->where('id', $id)->delete();
+        $delete = DB::table('used')->where('id', $id)->where('is_delete', 0)->update(['is_delete' => 1]);
 
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Utilities', 'Delete', 'Deleted use of equipment ID: '.$id.'.', 'Use of Equipment', $id, ['name' => $used->used ?? '-', 'description' => $used->Description ?? '-'], null);
         } else {
             $res['success'] = 'failed';
         }

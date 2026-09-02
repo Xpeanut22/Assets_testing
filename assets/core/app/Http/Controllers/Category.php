@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\ReceiverModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Category extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -129,6 +131,7 @@ class Category extends Controller
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail('Utilities', 'Create', 'Created category: '.$category.'.', 'Category', null, null, ['category' => $category, 'description' => $description]);
             } else {
                 $res['message'] = 'failed';
             }
@@ -164,6 +167,7 @@ class Category extends Controller
         if ($categorycheck) {
             $res['message'] = 'exist';
         } else {
+            $oldCategory = DB::table('category')->where('id', $id)->where('is_delete', 0)->first();
 
             $update = DB::table('category')->where('id', $id)->where('is_delete', 0)
                 ->update(
@@ -175,6 +179,9 @@ class Category extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $diff = $this->auditCalculateDiff($oldCategory, ['category' => $category, 'description' => $description], ['category' => 'Category', 'description' => 'Description']);
+                $detailsText = 'Updated category: '.$category.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Category', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -196,11 +203,13 @@ class Category extends Controller
         //set delete if no assets to this user
 
         $id = $request->input('id');
+        $category = DB::table('category')->where('id', $id)->where('is_delete', 0)->first();
 
         $delete = DB::table('category')->where('id', $id)->where('is_delete', 0)->update(['is_delete' => 1]);
 
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Utilities', 'Delete', 'Deleted category ID: '.$id.'.', 'Category', $id, ['category' => $category->category ?? '-', 'description' => $category->Description ?? '-'], null);
         } else {
             $res['success'] = 'failed';
         }

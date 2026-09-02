@@ -191,31 +191,26 @@
                 }
             },
             {
-                extend: 'pdf',
                 text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                 className: 'btn btn-sm btn-fill btn-info ',
-                title: '<?php echo trans('lang.reportbytype');?>',
-                orientation: 'landscape',
-                exportOptions: {
-                    columns: [1, 2, 3, 4, 5,6, 7, 8, 9, 10]
-                },
-                customize: function(doc) {
-                    doc.styles.tableHeader.alignment = 'left';
-                    doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                        .join('*').split('');
+                action: function() {
+                    openByTypePdf();
                 }
             },
             {
-                extend: 'print',
-                title: '<?php echo trans('lang.reportbytype');?>',
-                className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
-                exportOptions: {
-                    columns: [1, 2, 3, 4, 5,6, 7, 8, 9, 10]
+                className: 'btn btn-sm btn-fill btn-info ',
+                action: function() {
+                    openByTypePdf();
                 }
             }
         ]
     });
+
+    function openByTypePdf() {
+        var assettype = $("#typeid").val() || '';
+        window.open("{{ url('/reports/bytype/print') }}?assettype=" + encodeURIComponent(assettype), '_blank');
+    }
     
     //do filter
     

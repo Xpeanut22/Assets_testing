@@ -196,6 +196,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.reportbytype');?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5,6, 7, 8, 9, 10]
                 },
@@ -210,6 +211,7 @@
                 title: '<?php echo trans('lang.reportbytype');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4, 5,6, 7, 8, 9, 10]
                 }

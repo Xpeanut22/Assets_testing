@@ -11,14 +11,16 @@ class AssetsModel extends Model
 
 	 public function getStatusAttribute($value)
     {
-        return [
+        $statuses = [
         '1' => trans('lang.readytodeploy'),
         '2' => trans('lang.pending'),
         '3' => trans('lang.archived'),
         '4' => trans('lang.broken'),
         '5' => trans('lang.lost'),
         '6' => trans('lang.outofrepair')
-        ][$value];
+        ];
+        
+        return isset($statuses[$value]) ? $statuses[$value] : $value;
     }
 
 }

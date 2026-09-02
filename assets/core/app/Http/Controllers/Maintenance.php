@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\BrandModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Maintenance extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -37,18 +39,18 @@ class Maintenance extends Controller
     public function getdata()
     {
         $maintenanceDeleteFilter = DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete') ? 'and maintenance.is_delete = 0' : '';
+        $loggedInFullname = DB::getPdo()->quote(Auth::user()->fullname ?: '-');
 
         $data = DB::select("select maintenance.*, supplier.name as supplier, assets.name as asset, assets.id as assetsid, assets.assettag,
-        CASE
-            WHEN maintenance.type = 'Unserviceable' THEN IFNULL(employees.fullname, receiver.fullname)
-            ELSE IFNULL(receiver.fullname, employees.fullname)
-        END as fullname
+        COALESCE(NULLIF(users.fullname, ''), NULLIF(receiver.fullname, ''), NULLIF(employees.fullname, ''), CASE WHEN maintenance.created_by is null OR maintenance.created_by = '' OR maintenance.created_by = '0' THEN $loggedInFullname ELSE NULLIF(maintenance.created_by, '') END, '-') as fullname
         from maintenance left join supplier 
         on maintenance.supplierid = supplier.id left join assets 
         on maintenance.assetid = assets.id left join receiver
         on maintenance.created_by = receiver.id
         left join employees
         on maintenance.created_by = employees.id
+        left join users
+        on maintenance.created_by = users.id
         where maintenance.type != 'Operational'
         $maintenanceDeleteFilter
         order by maintenance.created_at desc");
@@ -161,6 +163,9 @@ class Maintenance extends Controller
         $startdate      = $request->input('startdate');
         $enddate        = $request->input('enddate');
         $receivedby     = $request->input('receivedby');
+        if ($receivedby === null || $receivedby === '' || $receivedby === '0' || $receivedby === 0) {
+            $receivedby = Auth::id() ?: Auth::user()->fullname;
+        }
 
         $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
@@ -191,6 +196,8 @@ class Maintenance extends Controller
 
         if ($insert) {
             $res['success'] = 'success';
+            $asset = DB::table('assets')->where('id', $assetid)->first();
+            $this->auditTrail('Maintenance', 'Create', 'Created maintenance for '.($asset ? $asset->name.' ('.$asset->assettag.')' : 'asset ID '.$assetid).'.');
         } else {
             $res['success'] = 'failed';
         }
@@ -220,6 +227,11 @@ class Maintenance extends Controller
         // dd($request->input('startdate'));
         $enddate        = $request->input('enddate');
         $updated_at     = date("Y-m-d H:i:s");
+        $oldMaintenanceQuery = DB::table('maintenance')->where('id', $id);
+        if (DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete')) {
+            $oldMaintenanceQuery->where('is_delete', 0);
+        }
+        $oldMaintenance = $oldMaintenanceQuery->first();
         $query = DB::table('maintenance')->where('id', $id);
         if (DB::getSchemaBuilder()->hasColumn('maintenance', 'is_delete')) {
             $query->where('is_delete', 0);
@@ -249,6 +261,26 @@ class Maintenance extends Controller
 
         if ($update) {
             $res['success'] = 'success';
+            $asset = DB::table('assets')->where('id', $assetid)->first();
+            $labelMap = [
+                'assetid' => 'Asset ID',
+                'type' => 'Type',
+                'mamount' => 'Amount',
+                'reason_remarks' => 'Reason/Remarks',
+                'startdate' => 'Start Date',
+                'enddate' => 'End Date'
+            ];
+            $newData = [
+                'assetid' => $assetid,
+                'type' => $type,
+                'mamount' => $mamount,
+                'reason_remarks' => $reason_remarks,
+                'startdate' => $startdate,
+                'enddate' => $enddate
+            ];
+            $diff = $this->auditCalculateDiff($oldMaintenance, $newData, $labelMap);
+            $detailsText = 'Updated maintenance for '.($asset ? $asset->name.' ('.$asset->assettag.')' : 'asset ID '.$assetid) . ($diff['details'] ? ":\n" . $diff['details'] : '');
+            $this->auditTrail('Maintenance', 'Update', $detailsText, 'Maintenance', $id, $diff['old'], $diff['new']);
         } else {
             $res['success'] = 'failed';
         }
@@ -270,6 +302,7 @@ class Maintenance extends Controller
             ->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Maintenance', 'Delete', 'Deleted maintenance ID: '.$id.'.');
         } else {
             $res['success'] = 'failed';
         }

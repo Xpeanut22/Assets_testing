@@ -1126,7 +1126,10 @@
         }
 
         "use strict";
-        $('#data').DataTable({
+        var assetVehicleTable = $('#data').DataTable({
+            dom: "<'row align-items-center mb-2'<'col-sm-6'B><'col-sm-6'f>>" +
+                "<'row'<'col-sm-12'tr>>" +
+                "<'row'<'col-sm-4'l><'col-sm-4'i><'col-sm-4'p>>",
             ajax: "{{ url('assetvehicle')}}",
             columns: [{
                     data: 'id',
@@ -1234,31 +1237,32 @@
                     }
                 },
                 {
-                    extend: 'pdf',
                     text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                     className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.asset_list'); ?>',
-                    orientation: 'landscape',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
-                    },
-                    customize: function(doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-                        doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                            .join('*').split('');
+                    action: function() {
+                        window.open("{{ url('/assetvehiclelist/print') }}", '_blank');
                     }
                 },
                 {
-                    extend: 'print',
-                    title: '<?php echo trans('lang.asset_list'); ?>',
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
-                    exportOptions: {
-                        columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    action: function() {
+                        window.open("{{ url('/assetvehiclelist/print') }}", '_blank');
                     }
                 }
             ]
         });
+
+        function clearAssetVehicleTableSearch() {
+            assetVehicleTable.search('').draw();
+            $('#data_filter input')
+                .val('')
+                .attr('autocomplete', 'off')
+                .attr('name', 'asset_vehicle_table_search_' + Date.now());
+        }
+        clearAssetVehicleTableSearch();
+        setTimeout(clearAssetVehicleTableSearch, 100);
+        setTimeout(clearAssetVehicleTableSearch, 500);
 
 
 
@@ -1827,11 +1831,29 @@
 
 
 
+        function openPreparedVehiclePrintout(printWindow, printUrl) {
+            if (!printUrl) {
+                if (printWindow) {
+                    printWindow.close();
+                }
+                return;
+            }
+
+            if (printWindow && !printWindow.closed) {
+                printWindow.location.href = printUrl;
+                return;
+            }
+
+            var fallbackWindow = window.open(printUrl, '_blank');
+            if (!fallbackWindow) {
+                alert('Borrowed/return form was saved. Please allow pop-ups, then open the printout again.');
+            }
+        }
+
         //checkout
         $("#formcheckout").validate({
             submitHandler: function(form) {
-                var shouldOpenPrint = $("#checkoutvehiclestatus").val() === 'borrowed';
-                var printWindow = shouldOpenPrint ? window.open('', '_blank') : null;
+                var printWindow = window.open('', '_blank');
                 if (printWindow) {
                     printWindow.document.write('<p style="font-family: Arial; padding: 20px;">Preparing borrowed form...</p>');
                 }
@@ -1846,16 +1868,7 @@
                         $("#checkoutsuccess").css({
                             'display': "block"
                         });
-                        if (data.print_url) {
-                            if (printWindow) {
-                                printWindow.location = data.print_url;
-                            } else {
-                                window.location.href = data.print_url;
-                                return;
-                            }
-                        } else if (printWindow) {
-                            printWindow.close();
-                        }
+                        openPreparedVehiclePrintout(printWindow, data.print_url);
                         $('#checkout').modal('hide');
                         window.setTimeout(function() {
                             location.reload()
@@ -1874,8 +1887,7 @@
         //checkin
         $("#formcheckin").validate({
             submitHandler: function(form) {
-                var shouldOpenPrint = $("#checkinvehiclestatus").val() === 'returned';
-                var printWindow = shouldOpenPrint ? window.open('', '_blank') : null;
+                var printWindow = window.open('', '_blank');
                 if (printWindow) {
                     printWindow.document.write('<p style="font-family: Arial; padding: 20px;">Preparing return form...</p>');
                 }
@@ -1890,16 +1902,7 @@
                         $("#checkinsuccess").css({
                             'display': "block"
                         });
-                        if (data.print_url) {
-                            if (printWindow) {
-                                printWindow.location = data.print_url;
-                            } else {
-                                window.location.href = data.print_url;
-                                return;
-                            }
-                        } else if (printWindow) {
-                            printWindow.close();
-                        }
+                        openPreparedVehiclePrintout(printWindow, data.print_url);
                         $('#checkin').modal('hide');
                         window.setTimeout(function() {
                             location.reload()

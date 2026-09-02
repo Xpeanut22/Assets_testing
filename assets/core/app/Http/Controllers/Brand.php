@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\BrandModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class Brand extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct() {
 		
@@ -130,7 +132,7 @@ class Brand extends Controller
 
 		if ( $insert ) {
 			$res['success'] = 'success';
-			
+			$this->auditTrail('Utilities', 'Create', 'Created brand: '.$name.'.', 'Brand', null, null, ['name' => $name, 'description' => $description, 'type' => $type]);
         } else{
             $res['success'] = 'failed';
         }
@@ -150,8 +152,9 @@ class Brand extends Controller
         $name           = $request->input( 'name' );
         $description    = $request->input( 'description' );
         $type    = $request->input( 'brandtype' );
-        $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
+
+        $oldBrand = DB::table('brand')->where('id', $id)->where('is_delete', 0)->first();
 
 		$update = DB::table( 'brand' )->where( 'id', $id )->where('is_delete', 0)
 		->update(
@@ -164,7 +167,9 @@ class Brand extends Controller
         
         if ( $update ) {
 			$res['success'] = 'success';
-			
+			$diff = $this->auditCalculateDiff($oldBrand, ['name' => $name, 'description' => $description, 'type' => $type], ['name' => 'Name', 'description' => 'Description', 'type' => 'Type']);
+			$detailsText = 'Updated brand: '.$name.($diff['details'] ? ":\n" . $diff['details'] : '');
+			$this->auditTrail('Utilities', 'Update', $detailsText, 'Brand', $id, $diff['old'], $diff['new']);
         } else{
             $res['success'] = 'failed';
         }
@@ -181,9 +186,11 @@ class Brand extends Controller
 
 	public function delete( Request $request ) {
 		$id = $request->input( 'id' );
+		$brand = DB::table('brand')->where('id', $id)->where('is_delete', 0)->first();
 		$delete = DB::table( 'brand' )->where( 'id', $id )->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
             if ( $delete ) {
                 $res['success'] = 'success';
+                $this->auditTrail('Utilities', 'Delete', 'Deleted brand ID: '.$id.'.', 'Brand', $id, ['name' => $brand->name ?? '-', 'description' => $brand->description ?? '-', 'type' => $brand->type ?? '-'], null);
             } else{
                 $res['success'] = 'failed';
             }

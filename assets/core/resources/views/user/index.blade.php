@@ -209,6 +209,23 @@
 <script>
 (function($) {
 "use strict";  
+
+$.ajaxSetup({
+    headers: {
+        'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+    }
+});
+
+function showUserSaveError(xhr) {
+    var message = 'Unable to save user. Please check the required fields.';
+    if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+        message = xhr.responseJSON.message;
+    } else if (xhr && xhr.responseText) {
+        message = xhr.responseText.replace(/<[^>]*>?/gm, '').trim().substring(0, 250) || message;
+    }
+    alert(message);
+}
+
     $('#data').DataTable({
 
         ajax: "{{ url('user')}}",
@@ -268,6 +285,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.user_list');?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4 ,5, 6]
                 },
@@ -282,6 +300,7 @@
                 title: '<?php echo trans('lang.user_list');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [1, 2, 3, 4 ,5, 6]
                 }
@@ -313,6 +332,12 @@ $("#formadd").validate({
                 if(data.message=='exist'){
                     $(".messageexist").css({'display':"block"});
                 }
+                if(data.message=='failed'){
+                    alert('Unable to save user.');
+                }
+            },
+            error: function(xhr) {
+                showUserSaveError(xhr);
             }
 		});
     }
@@ -342,7 +367,13 @@ $("#formedit").validate({
                 if(data.message=='exist'){
                     $(".messageexist").css({'display':"block"});
                 }
+                if(data.message=='failed'){
+                    alert('Unable to update user.');
+                }
 
+            },
+            error: function(xhr) {
+                showUserSaveError(xhr);
             }
 		});
     }

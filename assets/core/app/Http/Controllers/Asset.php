@@ -7,6 +7,7 @@ use App\AssetModel;
 use Illuminate\Support\Facades\File;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -21,6 +22,25 @@ require(app_path('fpdf\fpdf.php'));
 class Asset extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
+
+    private function officialFooterPath()
+    {
+        return resource_path('views/component/Munti_IssuanceForm_AMS/Munti_IssuanceForm_AMS/CGM FOOTER.png');
+    }
+
+    private function drawOfficialFooter($pdf, $height = 18)
+    {
+        $footer = $this->officialFooterPath();
+        if (!file_exists($footer)) {
+            return;
+        }
+
+        $pageWidth = $pdf->GetPageWidth();
+        $pageHeight = $pdf->GetPageHeight();
+        $y = max(0, $pageHeight - $height);
+        $pdf->Image($footer, 0, $y, $pageWidth, $height);
+    }
 
     public function __construct()
     {
@@ -67,13 +87,13 @@ class Asset extends Controller
         $assetDeleteFilter = DB::getSchemaBuilder()->hasColumn('assets', 'is_delete') ? 'AND assets.is_delete = 0' : '';
 
         $data = DB::select("
-    SELECT 
-        assets.*, 
+    SELECT
+        assets.*,
         ah.depid as depid,
-        supplier.name as supplier, 
-        brand.name as brand, 
-        asset_type.name as type, 
-        location.name as location, 
+        supplier.name as supplier,
+        brand.name as brand,
+        asset_type.name as type,
+        location.name as location,
         category.category as categoryname
     FROM assets
     LEFT JOIN supplier ON assets.supplierid = supplier.id
@@ -115,7 +135,7 @@ class Asset extends Controller
                 <i class="fa fa-ellipsis-h" aria-hidden="true"></i>
                 </button>
                 <div class="dropdown-menu actionmenu">
-                
+
                 <div class="dropdown-divider"></div>
                 <a class="dropdown-item" href="' . url('/') . '/assetlist/detail/' . $accountsingle->id . '"id="btndetail" customdata=' . $accountsingle->id . '  ><i class="fa fa-file-text"></i> ' . trans('lang.detail') . '</a>
                 <a class="dropdown-item" href="#" id="btnedit" customdata=' . $accountsingle->id . '  data-toggle="modal" data-target="#edit"><i class="fa fa-pencil"></i> ' . trans('lang.edit') . '</a>
@@ -137,27 +157,14 @@ class Asset extends Controller
     public function getGroupedAssets()
     {
         $hasAssetDeleteColumn = DB::getSchemaBuilder()->hasColumn('assets', 'is_delete');
-        $assetDeleteFilter = $hasAssetDeleteColumn ? 'AND is_delete = 0' : '';
         $assetAliasDeleteFilter = $hasAssetDeleteColumn ? 'AND a.is_delete = 0' : '';
 
         $data = DB::select("
-        SELECT 
+        SELECT
             a.name,
             COUNT(*) as total,
-            (
-                SELECT picture 
-                FROM assets 
-                WHERE name = a.name
-                $assetDeleteFilter
-                AND picture IS NOT NULL 
-                LIMIT 1
-            ) as picture,
-            (
-                SELECT GROUP_CONCAT(assettag SEPARATOR ',') 
-                FROM assets 
-                WHERE name = a.name
-                $assetDeleteFilter
-            ) as all_tags
+            MIN(NULLIF(a.picture, '')) as picture,
+            GROUP_CONCAT(a.assettag SEPARATOR ',') as all_tags
         FROM assets a
         WHERE a.typeid != 7
         $assetAliasDeleteFilter
@@ -185,9 +192,9 @@ class Asset extends Controller
         $assetDeleteFilter = DB::getSchemaBuilder()->hasColumn('assets', 'is_delete') ? 'AND assets.is_delete = 0' : '';
 
         $data = DB::select("
-        SELECT 
-            assets.*, 
-            brand.name as brand, 
+        SELECT
+            assets.*,
+            brand.name as brand,
             asset_type.name as type,
             category.category as categoryname,
             location.name as location,
@@ -250,9 +257,9 @@ class Asset extends Controller
 
         $data = DB::select("select asset_history.*, assets.name as assetname,  IFNULL(employees.fullname, '-') as employeename, users.fullname, department.name as office
 
-        from asset_history left join assets  
+        from asset_history left join assets
         on asset_history.assetid = assets.id
-        left join employees 
+        left join employees
         on asset_history.employeeid = employees.id left join users
         on users.id = asset_history.created_by left join department
         on employees.departmentid = department.id
@@ -286,8 +293,195 @@ class Asset extends Controller
             ->make(true);
     }
 
+    public function printassethistoryreport(Request $request, $id)
+    {
+        if (!class_exists('\FPDF')) {
+            require_once app_path('fpdf/fpdf.php');
+        }
+
+        $search = trim((string) $request->get('search', ''));
+
+        $query = DB::table('asset_history')
+            ->leftJoin('assets', 'asset_history.assetid', '=', 'assets.id')
+            ->leftJoin('employees', 'asset_history.employeeid', '=', 'employees.id')
+            ->leftJoin('users', 'users.id', '=', 'asset_history.created_by')
+            ->leftJoin('department', 'employees.departmentid', '=', 'department.id')
+            ->select(
+                'asset_history.*',
+                'assets.name as assetname',
+                'assets.assettag',
+                DB::raw("IFNULL(employees.fullname, '-') as employeename"),
+                'users.fullname',
+                'department.name as office'
+            )
+            ->where('asset_history.assetid', $id);
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $query->where(function ($subQuery) use ($like) {
+                $subQuery->where('assets.name', 'like', $like)
+                    ->orWhere('assets.assettag', 'like', $like)
+                    ->orWhere('employees.fullname', 'like', $like)
+                    ->orWhere('users.fullname', 'like', $like)
+                    ->orWhere('department.name', 'like', $like)
+                    ->orWhere('asset_history.remarks', 'like', $like)
+                    ->orWhere('asset_history.created_at', 'like', $like)
+                    ->orWhere('asset_history.date', 'like', $like)
+                    ->orWhere('asset_history.status', 'like', $like);
+            });
+        }
+
+        $rows = $query->orderBy('asset_history.created_at', 'desc')->get();
+        $first = $rows->first();
+
+        if (!$first) {
+            abort(404);
+        }
+
+        $pdf = new \FPDF('L', 'mm', 'LETTER');
+        $pdf->SetAutoPageBreak(false);
+
+        $statusText = function ($status) {
+            if ((string) $status === '1') {
+                return trans('lang.checkout');
+            }
+            if ((string) $status === '2') {
+                return trans('lang.checkin');
+            }
+            if ((string) $status === '3') {
+                return trans('lang.serviceable');
+            }
+            if ((string) $status === '4') {
+                return trans('lang.unserviceable');
+            }
+            return trans('lang.undefined');
+        };
+
+        $fit = function ($value, $width) use ($pdf) {
+            $value = trim((string) $value);
+            if ($value === '') {
+                return '-';
+            }
+
+            $maxWidth = max(1, $width - 1.5);
+            if ($pdf->GetStringWidth($value) <= $maxWidth) {
+                return $value;
+            }
+
+            while (strlen($value) > 0 && $pdf->GetStringWidth($value . '...') > $maxWidth) {
+                $value = substr($value, 0, -1);
+            }
+
+            return trim($value) . '...';
+        };
+
+        $drawHeader = function ($withLetterhead = true) use ($pdf, $first) {
+            $pdf->AddPage();
+            $this->drawOfficialFooter($pdf);
+
+            if (!$withLetterhead) {
+                $pdf->SetFont('Arial', 'B', 7);
+                $pdf->SetXY(5, 12);
+                $pdf->SetFillColor(37, 150, 190);
+                $pdf->Cell(10, 7, 'No.', 1, 0, 'C', true);
+                $pdf->Cell(28, 7, 'Action', 1, 0, 'C', true);
+                $pdf->Cell(36, 7, 'Date & Time', 1, 0, 'C', true);
+                $pdf->Cell(42, 7, 'Employee', 1, 0, 'C', true);
+                $pdf->Cell(30, 7, 'Office', 1, 0, 'C', true);
+                $pdf->Cell(38, 7, 'Created By', 1, 0, 'C', true);
+                $pdf->Cell(88, 7, 'Remarks', 1, 1, 'C', true);
+                return 19;
+            }
+
+            $pageWidth = $pdf->GetPageWidth();
+            $muntiLogo = app_path('fpdf/muntilogo.png');
+            $ddrmLogo = app_path('fpdf/drlogo.png');
+
+            if (file_exists($muntiLogo)) {
+                $pdf->Image($muntiLogo, 12, 5, 22, 22);
+            }
+            if (file_exists($ddrmLogo)) {
+                $pdf->Image($ddrmLogo, $pageWidth - 34, 5, 20, 20);
+            }
+
+            $pdf->SetFont('Arial', '', 8);
+            $pdf->SetXY(0, 7);
+            $pdf->Cell($pageWidth, 4, 'Republic of the Philippines', 0, 1, 'C');
+            $pdf->SetFont('Arial', 'B', 8);
+            $pdf->Cell($pageWidth, 4, 'CITY GOVERNMENT OF MUNTINLUPA', 0, 1, 'C');
+            $pdf->SetFont('Arial', '', 8);
+            $pdf->Cell($pageWidth, 4, 'City of Muntinlupa', 0, 1, 'C');
+            $pdf->SetFont('Arial', 'B', 8);
+            $pdf->Cell($pageWidth, 4, 'DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT', 0, 1, 'C');
+            $pdf->SetFont('Arial', '', 8);
+            $pdf->Cell($pageWidth, 4, '(Formerly Muntinlupa City Disaster Risk Reduction Management Office)', 0, 1, 'C');
+            $pdf->Cell($pageWidth, 4, 'Hall of Justice Compound, Resilience Building, Susana Heights, Tunasan, Muntinlupa City', 0, 1, 'C');
+            $pdf->Cell($pageWidth, 4, 'Tel No.: 8925-43-82', 0, 1, 'C');
+
+            $pdf->SetLineWidth(0.5);
+            $pdf->Line(5, 43, $pageWidth - 5, 43);
+            $pdf->Line(5, 45, $pageWidth - 5, 45);
+
+            $pdf->SetFont('Arial', 'B', 9);
+            $pdf->SetXY($pageWidth - 65, 48);
+            $pdf->Cell(14, 5, 'DATE:', 0, 0, 'R');
+            $pdf->Cell(30, 5, date('Y-m-d'), 'B', 0, 'C');
+
+            $pdf->SetFont('Arial', 'B', 14);
+            $pdf->SetXY(0, 56);
+            $pdf->Cell($pageWidth, 6, 'ASSET HISTORY REPORT', 0, 1, 'C');
+
+            $pdf->SetFont('Arial', 'B', 9);
+            $pdf->SetXY(0, 63);
+            $pdf->Cell($pageWidth, 5, strtoupper(($first->assetname ?: 'ASSET') . ' (' . ($first->assettag ?: '-') . ')'), 0, 1, 'C');
+
+            $pdf->SetFont('Arial', 'B', 7);
+            $pdf->SetXY(5, 72);
+            $pdf->SetFillColor(37, 150, 190);
+            $pdf->Cell(10, 7, 'No.', 1, 0, 'C', true);
+            $pdf->Cell(28, 7, 'Action', 1, 0, 'C', true);
+            $pdf->Cell(36, 7, 'Date & Time', 1, 0, 'C', true);
+            $pdf->Cell(42, 7, 'Employee', 1, 0, 'C', true);
+            $pdf->Cell(30, 7, 'Office', 1, 0, 'C', true);
+            $pdf->Cell(38, 7, 'Created By', 1, 0, 'C', true);
+            $pdf->Cell(88, 7, 'Remarks', 1, 1, 'C', true);
+            return 78;
+        };
+
+        $y = $drawHeader(true);
+        $rowHeight = 8;
+
+        foreach ($rows as $index => $row) {
+            if ($y + $rowHeight > 190) {
+                $y = $drawHeader(false);
+            }
+
+            $createdAt = !empty($row->created_at) ? date('M d, Y h:i:s A', strtotime($row->created_at)) : '-';
+            $pdf->SetFont('Arial', '', 7);
+            $pdf->SetXY(5, $y);
+            $pdf->Cell(10, $rowHeight, ($index + 1) . '.', 1, 0, 'C');
+            $pdf->Cell(28, $rowHeight, $fit($statusText($row->status), 28), 1, 0, 'C');
+            $pdf->Cell(36, $rowHeight, $fit($createdAt, 36), 1, 0, 'C');
+            $pdf->Cell(42, $rowHeight, $fit($row->employeename, 42), 1, 0, 'L');
+            $pdf->Cell(30, $rowHeight, $fit($row->office, 30), 1, 0, 'L');
+            $pdf->Cell(38, $rowHeight, $fit($row->fullname, 38), 1, 0, 'L');
+            $pdf->Cell(88, $rowHeight, $fit($row->remarks, 88), 1, 1, 'L');
+            $y += $rowHeight;
+        }
+
+        if ($rows->isEmpty()) {
+            $pdf->SetFont('Arial', '', 8);
+            $pdf->SetXY(8, $y);
+            $pdf->Cell(272, 8, 'No records found.', 1, 1, 'C');
+        }
+
+        return response($pdf->Output('S'), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="asset_history_report_' . $id . '.pdf"');
+    }
+
     /**
-     * get single data 
+     * get single data
      * @param integer $id
      * @return object
      */
@@ -340,7 +534,7 @@ class Asset extends Controller
             //     $hstatus = trans('lang.checkout');
             // }
 
-            //get date format setting   
+            //get date format setting
             $setting = DB::table('settings')->where('id', '1')->first();
 
 
@@ -557,6 +751,7 @@ class Asset extends Controller
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail('Asset', 'Create', 'Created asset: '.$name.' ('.$assettag.').');
             } else {
                 $res['message'] = 'failed';
             }
@@ -596,6 +791,7 @@ class Asset extends Controller
         $picture        = $request->file('picture');
         $description    = $request->input('description');
         $created_at     = date("Y-m-d H:i:s");
+        $oldAsset       = DB::table('assets')->where('id', $id)->first();
         $updated_at     = date("Y-m-d H:i:s");
         $message = ['picture.mimes' => trans('lang.upload_error')];
 
@@ -677,6 +873,37 @@ class Asset extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $labelMap = [
+                    'name' => 'Name',
+                    'assettag' => 'Asset Tag',
+                    'locationid' => 'Location ID',
+                    'supplierid' => 'Supplier ID',
+                    'brandid' => 'Brand ID',
+                    'typeid' => 'Type ID',
+                    'unit' => 'Unit',
+                    'quantity' => 'Quantity',
+                    'purchasedate' => 'Purchase Date',
+                    'cost' => 'Cost',
+                    'warranty' => 'Warranty',
+                    'description' => 'Description'
+                ];
+                $newData = [
+                    'name' => $name,
+                    'assettag' => $assettag,
+                    'locationid' => $locationid,
+                    'supplierid' => $supplierid,
+                    'brandid' => $brandid,
+                    'typeid' => $typeid,
+                    'unit' => $unit,
+                    'quantity' => $quantity,
+                    'purchasedate' => $purchasedate,
+                    'cost' => $cost,
+                    'warranty' => $warranty,
+                    'description' => $description
+                ];
+                $diff = $this->auditCalculateDiff($oldAsset, $newData, $labelMap);
+                $detailsText = 'Updated asset: '.$name.' ('.$assettag.')' . ($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Asset', 'Update', $detailsText, 'Asset', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -720,9 +947,9 @@ class Asset extends Controller
         }
 
         $data = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'created_by' => $receiverby, 'control_number' => $controlno, 'created_at' => $created_at, 'updated_at' => $updated_at, 'remarks' => $remarks);
-        $insert = DB::table('asset_history')->insert($data);
+        $insertId = DB::table('asset_history')->insertGetId($data);
 
-        if ($insert) {
+        if ($insertId) {
 
             //set status in table asset
             $update = DB::table('assets')->where('id', $assetid)
@@ -735,6 +962,10 @@ class Asset extends Controller
                 );
 
             $res['success'] = 'success';
+            $res['id'] = $insertId;
+            $res['print_url'] = url('assetprintform/' . $insertId);
+            $asset = DB::table('assets')->where('id', $assetid)->first();
+            $this->auditTrail('Asset', 'Borrowed', 'Borrowed asset: '.($asset ? $asset->name.' ('.$asset->assettag.')' : 'asset ID '.$assetid).'.');
         } else {
             $res['success'] = 'failed';
         }
@@ -796,6 +1027,8 @@ class Asset extends Controller
                 );
 
             $res['success'] = 'success';
+            $asset = DB::table('assets')->where('id', $assetid)->first();
+            $this->auditTrail('Asset', 'Scan', 'Scanned asset: '.($asset ? $asset->name.' ('.$asset->assettag.')' : 'asset ID '.$assetid).'.');
         } else {
             $res['success'] = 'failed';
         }
@@ -818,7 +1051,7 @@ class Asset extends Controller
         }
 
         $firstAsset = reset($assets);
-        $batchControlNo = trim($firstAsset['controlno'] ?? '');
+        $batchControlNo = '';
         $date = $firstAsset['checkindate'] ?? null;
         // $typeofid = $firstAsset['typeofid'] ?? null;
         // $idno = $firstAsset['idno'] ?? null;
@@ -836,6 +1069,7 @@ class Asset extends Controller
             $currentCheckStatus = DB::table('assets')->where('id', $asset['assetid'])->value('checkstatus');
             if ($currentCheckStatus != '2') {
                 $hasCheckoutItem = true;
+                $batchControlNo = trim($asset['controlno'] ?? '');
                 break;
             }
         }
@@ -851,6 +1085,7 @@ class Asset extends Controller
         $receiverby = Auth::id();
         $timestamp = now();
         $successSaves = 0;
+        $scannedNames = [];
 
         $lastGroupId = DB::table('asset_history')->max('groupid');
         $groupid = $lastGroupId ? $lastGroupId + 1 : 1;
@@ -874,7 +1109,7 @@ class Asset extends Controller
                     ->orderBy('created_at', 'desc')
                     ->value('control_number');
             } else {
-                $controlNumber = $batchControlNo;
+                $controlNumber = trim($asset['controlno'] ?? '') ?: $batchControlNo;
             }
 
             $data = [
@@ -904,8 +1139,18 @@ class Asset extends Controller
                     'updated_at'  => $timestamp,
                     'condition'   => $asset['condition'] ?? null
                 ]);
+                $assetRecord = DB::table('assets')->where('id', $asset['assetid'])->first();
+                if ($assetRecord) {
+                    $scannedNames[] = $assetRecord->name . ' (' . $assetRecord->assettag . ')';
+                } else {
+                    $scannedNames[] = 'asset ID ' . $asset['assetid'];
+                }
                 $successSaves++;
             }
+        }
+
+        if ($successSaves > 0) {
+            $this->auditTrail('Asset', 'Scan', 'Scanned assets: ' . implode(', ', $scannedNames) . '.');
         }
 
         // return response()->json([
@@ -924,13 +1169,15 @@ class Asset extends Controller
         $userName = Auth::user()->fullname;
 
 
-        $id = $request->input('id');
+        $id = $request->route('id') ?: $request->input('id');
+        $printByHistoryId = (bool) $request->route('id');
         // dd($id);
-        $data = DB::table('asset_history')
+        $historyQuery = DB::table('asset_history')
             ->leftJoin('assets', 'asset_history.assetid', '=', 'assets.id')
             ->leftJoin('employees', 'asset_history.employeeid', '=', 'employees.id')
             ->leftJoin('users', 'users.id', '=', 'asset_history.created_by')
-            ->leftJoin('department', 'employees.departmentid', '=', 'department.id')
+            ->leftJoin('department as representing_department', 'asset_history.depid', '=', 'representing_department.id')
+            ->leftJoin('department as employee_department', 'employees.departmentid', '=', 'employee_department.id')
             ->select(
                 'asset_history.*',
                 'assets.name as assetname',
@@ -938,20 +1185,30 @@ class Asset extends Controller
                 'assets.assettag as assettag',
                 DB::raw("IFNULL(employees.fullname, '-') as employeename"),
                 'users.fullname',
-                'department.name as office',
+                DB::raw("COALESCE(representing_department.name, employee_department.name) as office"),
                 'employees.mobile_number as contact_no'
-            )
-            ->where('asset_history.groupid', $id)
-            ->orderBy('asset_history.created_at', 'desc')
-            ->get();
+            );
+
+        if ($printByHistoryId) {
+            $historyQuery->where('asset_history.id', $id);
+        } else {
+            $historyQuery->where('asset_history.groupid', $id);
+        }
+
+        $data = $historyQuery->orderBy('asset_history.created_at', 'desc')->get();
         // var_dump($data);
         $first = $data->first();
+
+        if (!$first) {
+            abort(404);
+        }
 
         $pdf = new \FPDF('P', 'mm', 'LETTER');
         // $pdf->setTitle($data->id);
         $pdf->AliasNbPages();
         $pdf->AddPage();
         $pdf->SetAutoPageBreak(FALSE);
+        $this->drawOfficialFooter($pdf);
 
         // $pdf->AddFont('Arial', '', 'Arial-Regular.php');
         // $pdf->AddFont('Arial', 'B', 'Arial-Bold.php');
@@ -976,11 +1233,6 @@ class Asset extends Controller
 
         $pdf->Image(public_path('muntilogo.png'), 17, 5, 25, 25);
         $pdf->Image(public_path('drlogo.png'), 175, 5, 24, 24);
-        $pdf->Image(public_path('lowerline1.png'), 0, 277, 216, 3);
-        $pdf->Image(public_path('mun og.png'), 180, 260, 30, 15);
-
-
-
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetXY(0, 25);
         $pdf->cell(216, 4, 'DEPARTMENT OF DISASTER RESILIENCE AND MANAGEMENT', 0, 1, 'C');
@@ -1053,7 +1305,7 @@ class Asset extends Controller
         $pdf->cell(78.5, 4, utf8_decode($first->contact_no), 'B', 1, 'L');
 
         //         $text = "I, _____________________________________, hereby claim total responsibility for the proper use and deployment of the
-        // equipment and also it must be kept in good condition and must be kept clean at all times. I understand that if this piece 
+        // equipment and also it must be kept in good condition and must be kept clean at all times. I understand that if this piece
         // of equipment is lost, stolen, damaged etc. I am responsible for its replacement or repair and also I must submit an incident
         // report outlining what occured during the incident.";
 
@@ -1260,14 +1512,12 @@ $printFooter();
 // -------------------------
 // If more data, continue on next pages (no max 10 limit)
 // -------------------------
-if ($index < $total) {
+        if ($index < $total) {
 
     while ($index < $total) {
         $pdf->AddPage();
         $pdf->SetAutoPageBreak(FALSE);
-
-        // You likely want your background/footer images again on new pages if needed.
-        // If you need the same footer images, repeat $pdf->Image(...) here.
+        $this->drawOfficialFooter($pdf);
 
         // Table header on new page
         $pdf->SetXY($tableX, $nextPageStartY);
@@ -1304,9 +1554,13 @@ if ($index < $total) {
     $drawSignatories($signY);
 }
 
-$filename = (($first->status == 1)
-    ? 'borrowers_form_'
-    : 'returners_form_') . $id . '.pdf';
+$baseLabel = ($first->status == 1) ? 'borrowed_form' : 'return_form';
+$assetLabel = trim((string) ($first->assetname ?? 'asset'));
+$assetTagLabel = trim((string) ($first->assettag ?? $id));
+$safeAssetLabel = preg_replace('/[^A-Za-z0-9\-_]+/', '_', $assetLabel);
+$safeAssetTagLabel = preg_replace('/[^A-Za-z0-9\-_]+/', '_', $assetTagLabel);
+$filename = $baseLabel . '_' . trim($safeAssetLabel . '_' . $safeAssetTagLabel, '_') . '.pdf';
+$pdf->SetTitle(ucwords(str_replace('_', ' ', $baseLabel)) . ' - ' . $assetLabel . ' (' . $assetTagLabel . ')');
 
 return response($pdf->Output('S'), 200)
     ->header('Content-Type', 'application/pdf')
@@ -1342,9 +1596,9 @@ return response($pdf->Output('S'), 200)
         $updated_at     = date("Y-m-d H:i:s");
         $remarks        = $request->input('remarks');
         $data           = array('assetid' => $assetid, 'status' => $status, 'employeeid' => $employeeid, 'date' => $date, 'created_by' => $receiverby, 'control_number' => $controlno, 'created_at' => $created_at, 'updated_at' => $updated_at, 'remarks' => $remarks);
-        $insert         = DB::table('asset_history')->insert($data);
+        $insertId       = DB::table('asset_history')->insertGetId($data);
 
-        if ($insert) {
+        if ($insertId) {
             //set status in table asset
             $update = DB::table('assets')->where('id', $assetid)
                 ->update(
@@ -1354,6 +1608,10 @@ return response($pdf->Output('S'), 200)
                     ]
                 );
             $res['success'] = 'success';
+            $res['id'] = $insertId;
+            $res['print_url'] = url('assetprintform/' . $insertId);
+            $asset = DB::table('assets')->where('id', $assetid)->first();
+            $this->auditTrail('Asset', 'Returned', 'Returned asset: '.($asset ? $asset->name.' ('.$asset->assettag.')' : 'asset ID '.$assetid).'.');
         } else {
             $res['success'] = 'failed';
         }
@@ -1409,6 +1667,7 @@ return response($pdf->Output('S'), 200)
 
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('Asset', 'Delete', 'Deleted asset ID: '.$id.'.');
         } else {
             $res['success'] = 'failed';
         }
@@ -1494,7 +1753,7 @@ return response($pdf->Output('S'), 200)
 
     // $data = DB::select("select assets.*, asset_history.b
 
-    // from assets left join assets_history  
+    // from assets left join assets_history
     // on asset_history.assetid = assets.id
     // where asset.assettag = '$tag'");
     // return Datatables::of($data)

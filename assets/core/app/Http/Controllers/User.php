@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\UserModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use Illuminate\Support\Facades\Hash;
 use DB;
 use App;
@@ -14,6 +15,7 @@ use Auth;
 class User extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -98,7 +100,11 @@ class User extends Controller
     {
         $id            = $request->input('id');
 
-        $data = DB::table('users')->where('id', $id)->where('is_delete', 0)->first();
+        $query = DB::table('users')->where('id', $id);
+        if ($this->userHasDeleteColumn()) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->first();
 
         if ($data) {
             $res['success'] = 'success';
@@ -137,7 +143,9 @@ class User extends Controller
 
         $emailcheck = DB::table('users')
             ->where('email', '=', $email)
-            ->where('is_delete', 0)
+            ->when($this->userHasDeleteColumn(), function ($query) {
+                return $query->where('is_delete', 0);
+            })
             ->first();
 
         if ($emailcheck) {
@@ -152,14 +160,30 @@ class User extends Controller
                 'role' => $role,
                 'city' => $city,
                 'phone' => $phone,
-                'is_delete' => 0,
                 'created_at' => $created_at,
                 'updated_at' => $updated_at
             );
+            if ($this->userHasDeleteColumn()) {
+                $data['is_delete'] = 0;
+            }
             $insert     = DB::table('users')->insert($data);
 
             if ($insert) {
                 $res['message'] = 'success';
+                $this->auditTrail(
+                    'User',
+                    'Create',
+                    'Created User "'.$fullname.'".',
+                    'User',
+                    $email,
+                    null,
+                    [
+                        'Full Name' => $fullname,
+                        'Email' => $email,
+                        'Role' => $this->auditUserRoleName($role),
+                        'Status' => $this->auditUserStatusName($status)
+                    ]
+                );
             } else {
                 $res['message'] = 'failed';
             }
@@ -198,15 +222,43 @@ class User extends Controller
         $emailcheck = DB::table('users')
             ->where('email', '=', $email)
             ->where('id', '!=', $id)
-            ->where('is_delete', 0)
+            ->when($this->userHasDeleteColumn(), function ($query) {
+                return $query->where('is_delete', 0);
+            })
             ->first();
 
         if ($emailcheck) {
             $res['message'] = 'exist';
         } else {
+            $oldUserQuery = DB::table('users')->where('id', $id);
+            if ($this->userHasDeleteColumn()) {
+                $oldUserQuery->where('is_delete', 0);
+            }
+            $oldUser = $oldUserQuery->first();
+            $oldValues = $oldUser ? [
+                'Full Name' => $oldUser->fullname,
+                'Email' => $oldUser->email,
+                'Role' => $this->auditUserRoleName($oldUser->role),
+                'Status' => $this->auditUserStatusName($oldUser->status),
+                'City' => $oldUser->city,
+                'Phone' => $oldUser->phone
+            ] : null;
+            $newValues = [
+                'Full Name' => $fullname,
+                'Email' => $email,
+                'Role' => $this->auditUserRoleName($role),
+                'Status' => $this->auditUserStatusName($status),
+                'City' => $city,
+                'Phone' => $phone
+            ];
+            $changedDetails = $this->auditChangedDetails($oldValues, $newValues);
 
             if ($password != '') {
-                $update = DB::table('users')->where('id', $id)->where('is_delete', 0)
+                $updateQuery = DB::table('users')->where('id', $id);
+                if ($this->userHasDeleteColumn()) {
+                    $updateQuery->where('is_delete', 0);
+                }
+                $update = $updateQuery
                     ->update(
                         [
                             'fullname'          => $fullname,
@@ -222,11 +274,16 @@ class User extends Controller
 
                 if ($update) {
                     $res['message'] = 'success';
+                    $this->auditTrail('User', 'Update', 'Updated User "'.$fullname.'":'.$changedDetails, 'User', $id, $oldValues, $newValues);
                 } else {
                     $res['message'] = 'failed';
                 }
             } else {
-                $update = DB::table('users')->where('id', $id)->where('is_delete', 0)
+                $updateQuery = DB::table('users')->where('id', $id);
+                if ($this->userHasDeleteColumn()) {
+                    $updateQuery->where('is_delete', 0);
+                }
+                $update = $updateQuery
                     ->update(
                         [
                             'fullname'          => $fullname,
@@ -241,6 +298,7 @@ class User extends Controller
 
                 if ($update) {
                     $res['message'] = 'success';
+                    $this->auditTrail('User', 'Update', 'Updated User "'.$fullname.'":'.$changedDetails, 'User', $id, $oldValues, $newValues);
                 } else {
                     $res['message'] = 'failed';
                 }
@@ -259,13 +317,45 @@ class User extends Controller
     public function delete(Request $request)
     {
         $id = $request->input('id');
-        $delete = DB::table('users')->where('id', $id)->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
+        if ($this->userHasDeleteColumn()) {
+            $delete = DB::table('users')->where('id', $id)->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
+        } else {
+            $delete = DB::table('users')->where('id', $id)->delete();
+        }
         if ($delete) {
             $res['success'] = 'success';
+            $this->auditTrail('User', 'Delete', 'Deleted user ID: '.$id.'.', 'User', $id, null, null);
         } else {
             $res['success'] = 'failed';
         }
         return response($res);
+    }
+
+    private function auditUserRoleName($role)
+    {
+        return ((string) $role === '1') ? 'Admin' : 'User';
+    }
+
+    private function auditUserStatusName($status)
+    {
+        return ((string) $status === '1') ? 'Active' : 'Inactive';
+    }
+
+    private function auditChangedDetails($oldValues, $newValues)
+    {
+        if (!$oldValues) {
+            return '';
+        }
+
+        $lines = [];
+        foreach ($newValues as $key => $newValue) {
+            $oldValue = isset($oldValues[$key]) ? $oldValues[$key] : null;
+            if ((string) $oldValue !== (string) $newValue) {
+                $lines[] = "\n- ".$key.' changed from '.$oldValue.' to '.$newValue;
+            }
+        }
+
+        return count($lines) ? implode('', $lines) : "\n- No tracked field changes.";
     }
 
     public function requestpass(Request $request)
@@ -273,7 +363,11 @@ class User extends Controller
         $roleId = 1;
         $inputPassword = $request->input('password'); // Password from request
 
-        $users = DB::table('users')->select('password')->where('role', $roleId)->where('is_delete', 0)->get();
+        $usersQuery = DB::table('users')->select('password')->where('role', $roleId);
+        if ($this->userHasDeleteColumn()) {
+            $usersQuery->where('is_delete', 0);
+        }
+        $users = $usersQuery->get();
 
         $matched = false;
 
@@ -293,5 +387,10 @@ class User extends Controller
         }
 
         return response($res);
+    }
+
+    private function userHasDeleteColumn()
+    {
+        return DB::getSchemaBuilder()->hasColumn('users', 'is_delete');
     }
 }

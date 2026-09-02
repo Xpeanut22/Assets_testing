@@ -161,6 +161,8 @@
             <div class="modal-content">
                 <form id="formcheckout" method="POST" action="{{ url('/exportexcel') }}">
                     @csrf <!-- Laravel's CSRF protection -->
+                    <input type="hidden" id="datefrom_display" name="datefrom_display">
+                    <input type="hidden" id="dateto_display" name="dateto_display">
                     <div class="modal-header">
                         <h5 class="modal-title">Inventory Sheet</h5>
                         <button type="button" class="close" data-dismiss="modal">&times;</button>
@@ -170,9 +172,9 @@
                             <div class="form-group col-md-12">
                                 <label>From</label>
                                 <div class="input-group mb-0">
-                                    <input class="form-control setdate" required placeholder="Please select date"
-                                        id="datefrom" name="datefrom" type="datetime-local">
-                                    <span class="input-group-addon border-1" id="date"><i
+                                    <input class="form-control setdate" required autocomplete="off" placeholder="Please select date"
+                                        id="datefrom" name="datefrom" type="text">
+                                    <span class="input-group-addon border-1 inventory-calendar-trigger" data-target="#datefrom"><i
                                             class="fa fa-calendar"></i></span>
                                 </div>
                             </div>
@@ -181,9 +183,9 @@
                             <div class="form-group col-md-12">
                                 <label>To</label>
                                 <div class="input-group mb-0">
-                                    <input class="form-control setdate" required placeholder="Please select date"
-                                        id="dateto" name="dateto" type="datetime-local">
-                                    <span class="input-group-addon border-1" id="date1"><i
+                                    <input class="form-control setdate" required autocomplete="off" placeholder="Please select date"
+                                        id="dateto" name="dateto" type="text">
+                                    <span class="input-group-addon border-1 inventory-calendar-trigger" data-target="#dateto"><i
                                             class="fa fa-calendar"></i></span>
                                 </div>
                             </div>
@@ -457,6 +459,29 @@
         }
     });
 
+    document.getElementById('formcheckout').addEventListener('submit', function () {
+        document.getElementById('datefrom_display').value = document.getElementById('datefrom').value;
+        document.getElementById('dateto_display').value = document.getElementById('dateto').value;
+    });
+
+    $(document).on('click', '.inventory-calendar-trigger', function (e) {
+        e.preventDefault();
+        var target = $(this).data('target');
+        if (!target) {
+            return;
+        }
+
+        var $input = $(target);
+        if ($input.length) {
+            $input.focus();
+            $input.datepicker('show');
+        }
+    });
+
+    $('#printmodal').on('shown.bs.modal', function () {
+        $('#datefrom').trigger('focus');
+    });
+
     $.ajax({
         type: "GET",
         url: "{{ url('listreceiver')}}",
@@ -581,7 +606,7 @@
         }
 
         "use strict";
-        $('#data').DataTable({
+        var inventoryTable = $('#data').DataTable({
             ajax: "{{ url('inventory')}}",
             columns: [{
                 data: 'id',
@@ -660,6 +685,7 @@
                 className: 'btn btn-sm btn-fill btn-info ',
                 title: '<?php echo trans('lang.asset_list'); ?>',
                 orientation: 'landscape',
+                customize: standardPdfForm,
                 exportOptions: {
                     columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
                 },
@@ -674,14 +700,24 @@
                 title: '<?php echo trans('lang.asset_list'); ?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
+                customize: standardPrintForm,
                 exportOptions: {
                     columns: [2, 3, 4, 5, 6, 7, 8, 9, 10]
                 }
             }
             ],
             drawCallback: function () {
-                $('.dataTables_filter input').unbind();
-                $('.dataTables_filter input').bind('keyup', function (e) {
+                var $searchInput = $('.dataTables_filter input');
+                $searchInput
+                    .attr('autocomplete', 'off')
+                    .attr('autocorrect', 'off')
+                    .attr('autocapitalize', 'off')
+                    .attr('spellcheck', 'false')
+                    .attr('name', 'inventory_master_list_search')
+                    .val(inventoryTable.search());
+
+                $searchInput.unbind();
+                $searchInput.bind('keyup', function (e) {
                     var code = e.keyCode || e.which;
                     table = $("#data").DataTable();
                     if (code == 13) {
@@ -723,6 +759,14 @@
             },
 
         });
+
+        $('.dataTables_filter input')
+            .attr('autocomplete', 'off')
+            .attr('autocorrect', 'off')
+            .attr('autocapitalize', 'off')
+            .attr('spellcheck', 'false')
+            .attr('name', 'inventory_master_list_search')
+            .val('');
 
 
 

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\AssetTypeModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -15,6 +16,7 @@ use Auth;
 class AssetType extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct() {
 		
@@ -100,7 +102,7 @@ class AssetType extends Controller
 
 		if ( $insert ) {
 			$res['success'] = 'success';
-			
+			$this->auditTrail('Utilities', 'Create', 'Created asset type: '.$name.'.', 'Asset Type', null, null, ['name' => $name, 'description' => $description]);
         } else{
             $res['success'] = 'failed';
         }
@@ -119,8 +121,9 @@ class AssetType extends Controller
         $id             = $request->input( 'id' );
         $name           = $request->input( 'name' );
         $description    = $request->input( 'description' );
-        $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
+
+        $oldAssetType = DB::table('asset_type')->where('id', $id)->where('is_delete', 0)->first();
 
 		$update = DB::table( 'asset_type' )->where( 'id', $id )->where('is_delete', 0)
 		->update(
@@ -133,7 +136,9 @@ class AssetType extends Controller
         
         if ( $update ) {
 			$res['success'] = 'success';
-			
+			$diff = $this->auditCalculateDiff($oldAssetType, ['name' => $name, 'description' => $description], ['name' => 'Name', 'description' => 'Description']);
+			$detailsText = 'Updated asset type: '.$name.($diff['details'] ? ":\n" . $diff['details'] : '');
+			$this->auditTrail('Utilities', 'Update', $detailsText, 'Asset Type', $id, $diff['old'], $diff['new']);
         } else{
             $res['success'] = 'failed';
         }
@@ -150,9 +155,11 @@ class AssetType extends Controller
 
 	public function delete( Request $request ) {
 		$id = $request->input( 'id' );
+		$assetType = DB::table('asset_type')->where('id', $id)->where('is_delete', 0)->first();
 		$delete = DB::table( 'asset_type' )->where( 'id', $id )->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
             if ( $delete ) {
                 $res['success'] = 'success';
+                $this->auditTrail('Utilities', 'Delete', 'Deleted asset type ID: '.$id.'.', 'Asset Type', $id, ['name' => $assetType->name ?? '-', 'description' => $assetType->description ?? '-'], null);
             } else{
                 $res['success'] = 'failed';
             }

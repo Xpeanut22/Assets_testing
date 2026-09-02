@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\SupplierModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -13,6 +14,7 @@ use Auth;
 class Supplier extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct() {
 		
@@ -33,6 +35,9 @@ class Supplier extends Controller
 	 */
     public function getdata(){
         $data = DB::table('supplier')->select(['supplier.*']);
+        if (DB::getSchemaBuilder()->hasColumn('supplier', 'is_delete')) {
+            $data->where('is_delete', 0);
+        }
         return Datatables::of($data)
        
 		->addColumn( 'action', function ( $accountsingle ) {
@@ -48,7 +53,11 @@ class Supplier extends Controller
 	 * @return object
 	 */
     public function getrows(){
-        $data = DB::table('supplier')->get();
+        $query = DB::table('supplier');
+        if (DB::getSchemaBuilder()->hasColumn('supplier', 'is_delete')) {
+            $query->where('is_delete', 0);
+        }
+        $data = $query->get();
         if ( $data ) {
 			$res['success'] = true;
 			$res['message']= $data;
@@ -65,7 +74,7 @@ class Supplier extends Controller
     public function byid( Request $request ) {
         $id            = $request->input( 'id' );
 
-        $data = DB::table('supplier')->where('id', $id)->first();
+        $data = DB::table('supplier')->where('id', $id)->where('is_delete', 0)->first();
         
         if ( $data ) {
 			$res['success'] = 'success';
@@ -104,13 +113,14 @@ class Supplier extends Controller
 
         $emailcheck = DB::table('supplier')
 		    ->where('email', '=', $email)
+            ->where('is_delete', 0)
             ->first();
         
         if($emailcheck){
             $res['message'] = 'exist';  
         }
         else{ 
-      
+          
           
                 $data       = array('name'=>$name, 
                             'email'=>$email,
@@ -120,6 +130,7 @@ class Supplier extends Controller
                             'country'=>$country,
                             'city'=>$city,
                             'address'=>$address,
+                            'is_delete'=>0,
                             'created_at'=>$created_at,
                             'updated_at'=>$updated_at);
 
@@ -128,7 +139,7 @@ class Supplier extends Controller
 
             if ( $insert ) {
                 $res['message'] = 'success';
-                
+                $this->auditTrail('Utilities', 'Create', 'Created supplier: '.$name.'.', 'Supplier', null, null, ['name' => $name, 'email' => $email, 'phone' => $phone, 'address' => $address]);
             } else{
                 $res['message'] = 'failed';
             }
@@ -159,20 +170,21 @@ class Supplier extends Controller
         $city           = $request->input( 'city' );
         $country        = $request->input( 'country' );
         $address        = $request->input( 'address' );
-        $created_at     = date("Y-m-d H:i:s");
         $updated_at     = date("Y-m-d H:i:s");
       
         $emailcheck = DB::table('supplier')
         ->where('email', '=', $email)
         ->where('id', '!=', $id)
+        ->where('is_delete', 0)
         ->first();
     
         if($emailcheck){
                 $res['message'] = 'exist';  
         } 
         else{
+            $oldSupplier = DB::table('supplier')->where('id', $id)->where('is_delete', 0)->first();
 
-            $update = DB::table( 'supplier' )->where( 'id', $id )
+            $update = DB::table( 'supplier' )->where( 'id', $id )->where('is_delete', 0)
             ->update(
                 [
                 'name'              => $name,
@@ -188,7 +200,9 @@ class Supplier extends Controller
 
             if ( $update ) {
                 $res['message'] = 'success';
-                
+                $diff = $this->auditCalculateDiff($oldSupplier, ['name' => $name, 'email' => $email, 'phone' => $phone, 'address' => $address, 'city' => $city], ['name' => 'Name', 'email' => 'Email', 'phone' => 'Phone', 'address' => 'Address', 'city' => 'City']);
+                $detailsText = 'Updated supplier: '.$name.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Supplier', $id, $diff['old'], $diff['new']);
             } else{
                 $res['message'] = 'failed';
             }
@@ -206,10 +220,12 @@ class Supplier extends Controller
 	public function delete( Request $request ) {
 
         $id = $request->input( 'id' );      
-        $delete = DB::table( 'supplier' )->where( 'id', $id )->delete();
+        $supplier = DB::table('supplier')->where('id', $id)->where('is_delete', 0)->first();
+        $delete = DB::table( 'supplier' )->where( 'id', $id )->where('is_delete', 0)->update(['is_delete' => 1, 'updated_at' => date("Y-m-d H:i:s")]);
 
         if ( $delete ) {
             $res['success'] = 'success';
+            $this->auditTrail('Utilities', 'Delete', 'Deleted supplier ID: '.$id.'.', 'Supplier', $id, ['name' => $supplier->name ?? '-', 'email' => $supplier->email ?? '-'], null);
         } else{
             $res['success'] = 'failed';
         }

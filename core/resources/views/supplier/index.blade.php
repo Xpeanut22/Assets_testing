@@ -751,30 +751,19 @@
                 }
             },
             {
-                extend: 'pdf',
                 text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                 className: 'btn btn-sm btn-fill btn-info ',
-                title: '<?php echo trans('lang.supplier_list');?>',
-                orientation: 'landscape',
-                exportOptions: {
-                    columns: [1, 2, 3, 4 ,5, 6, 7]
-                },
-                customize: function(doc) {
-                    doc.styles.tableHeader.alignment = 'left';
-                    doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                        .join('*').split('');
+                action: function() {
+                    window.open("{{ url('/utilities/print/supplier') }}", '_blank');
                 }
             },
             {
-                extend: 'print',
-                title: '<?php echo trans('lang.supplier_list');?>',
                 className: 'btn btn-sm btn-fill btn-info ',
                 text: 'Print <i class="fa fa-print"></i>',
-                exportOptions: {
-                    columns: [1, 2, 3, 4 ,5, 6, 7]
+                action: function() {
+                    window.open("{{ url('/utilities/print/supplier') }}", '_blank');
                 }
-            }
-        ]
+            }]
     });
 
 //get all department

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\EmployeesModel;
 use Yajra\Datatables\Datatables;
 use App\Http\Controllers\TraitSettings;
+use App\Http\Controllers\TraitAuditTrail;
 use DB;
 use App\User;
 use App;
@@ -15,6 +16,7 @@ use Auth;
 class Employees extends Controller
 {
     use TraitSettings;
+    use TraitAuditTrail;
 
     public function __construct()
     {
@@ -151,6 +153,17 @@ class Employees extends Controller
 
             if ($insert) {
                 $res['message'] = 'success';
+                $departmentName = DB::table('department')->where('id', $department)->value('name');
+                $this->auditTrail('Utilities', 'Create', 'Created client: '.$fullname.'.', 'Client', null, null, [
+                    'fullname' => $fullname,
+                    'email' => $email,
+                    'mobile_number' => $number,
+                    'jobrole' => $jobrole,
+                    'department' => $departmentName ?: '-',
+                    'city' => $city,
+                    'country' => $country,
+                    'address' => $address
+                ]);
             } else {
                 $res['message'] = 'failed';
             }
@@ -194,6 +207,7 @@ class Employees extends Controller
         if ($emailcheck) {
             $res['message'] = 'exist';
         } else {
+            $oldEmployee = DB::table('employees')->where('id', $id)->where('is_delete', 0)->first();
 
             $update = DB::table('employees')->where('id', $id)->where('is_delete', 0)
                 ->update(
@@ -212,6 +226,38 @@ class Employees extends Controller
 
             if ($update) {
                 $res['message'] = 'success';
+                $departmentName = DB::table('department')->where('id', $department)->value('name');
+                $diff = $this->auditCalculateDiff($oldEmployee, [
+                    'fullname' => $fullname,
+                    'email' => $email,
+                    'mobile_number' => $number,
+                    'departmentid' => $department,
+                    'jobrole' => $jobrole,
+                    'city' => $city,
+                    'country' => $country,
+                    'address' => $address
+                ], [
+                    'fullname' => 'Full Name',
+                    'email' => 'Email',
+                    'mobile_number' => 'Mobile Number',
+                    'departmentid' => 'Department',
+                    'jobrole' => 'Job Role',
+                    'city' => 'City',
+                    'country' => 'Country',
+                    'address' => 'Address'
+                ]);
+
+                if (isset($diff['new']['Department'])) {
+                    $diff['new']['Department'] = $departmentName ?: '-';
+                }
+
+                if (isset($diff['old']['Department'])) {
+                    $oldDepartmentName = DB::table('department')->where('id', $oldEmployee->departmentid ?? null)->value('name');
+                    $diff['old']['Department'] = $oldDepartmentName ?: '-';
+                }
+
+                $detailsText = 'Updated client: '.$fullname.($diff['details'] ? ":\n" . $diff['details'] : '');
+                $this->auditTrail('Utilities', 'Update', $detailsText, 'Client', $id, $diff['old'], $diff['new']);
             } else {
                 $res['message'] = 'failed';
             }
@@ -233,6 +279,7 @@ class Employees extends Controller
         //set delete if no assets to this user
 
         $id = $request->input('id');
+        $employee = DB::table('employees')->where('id', $id)->where('is_delete', 0)->first();
 
         $delete = DB::table('employees')->where('id', $id)->where('is_delete', 0)
             ->update([
@@ -242,6 +289,14 @@ class Employees extends Controller
 
         if ($delete) {
             $res['success'] = 'success';
+            $departmentName = DB::table('department')->where('id', $employee->departmentid ?? null)->value('name');
+            $this->auditTrail('Utilities', 'Delete', 'Deleted client ID: '.$id.'.', 'Client', $id, [
+                'fullname' => $employee->fullname ?? '-',
+                'email' => $employee->email ?? '-',
+                'mobile_number' => $employee->mobile_number ?? '-',
+                'jobrole' => $employee->jobrole ?? '-',
+                'department' => $departmentName ?: '-'
+            ], null);
         } else {
             $res['success'] = 'failed';
         }

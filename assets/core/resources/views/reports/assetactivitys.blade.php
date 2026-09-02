@@ -13,6 +13,40 @@
             <div class="col-md-12">
                 <div class="card">
                     <div class="card-body ">
+                        <form action="" method="POST" id="form">
+                            <div class="form-row">
+                                <div class="form-group col-md-4">
+                                    <label><?php echo trans('lang.status'); ?></label>
+                                    <select name="statusfilter" id="statusfilter" class="form-control">
+                                        <option value="">All</option>
+                                        <option value="1">Borrowed</option>
+                                        <option value="2">Returned</option>
+                                        <option value="3">Serviceable</option>
+                                        <option value="4">Unserviceable</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-4">
+                                    <label>Report Type</label>
+                                    <select name="asset_scope" id="asset_scope" class="form-control">
+                                        <option value="">All</option>
+                                        <option value="assets">Assets</option>
+                                        <option value="vehicle">Assets Vehicle</option>
+                                    </select>
+                                </div>
+                                <div class="form-group col-md-2" style="padding-top:33px;">
+                                    <button type="submit" class="form-control btn btn-sm btn-fill btn-info"><i class="fa fa-search"></i> <?php echo trans('lang.search'); ?></button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body ">
                         <div class="table-responsive">
                             <table id="recentassetactivity" class="table table-striped table-bordered" cellspacing="0" width="100%">
                                 <thead>
@@ -86,8 +120,14 @@
         }
 
         "use strict";
-        $('#recentassetactivity').DataTable({
-            ajax: "{{ url('listassetactivityreport')}}",
+        var tabledata = $('#recentassetactivity').DataTable({
+            ajax: {
+                url: "{{ url('listassetactivityreport')}}",
+                data: function(d) {
+                    d.status = $("#statusfilter").val();
+                    d.asset_scope = $("#asset_scope").val();
+                }
+            },
             columns: [{
                     data: 'id',
                     orderable: false,
@@ -144,33 +184,34 @@
                     }
                 },
                 {
-                    extend: 'pdf',
                     text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                     className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.assetactivity'); ?>',
-                    orientation: 'landscape',
-                    exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6, 7]
-
-                    },
-                    customize: function(doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-                        doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                            .join('*').split('');
+                    action: function() {
+                        openActivityPdf();
                     }
                 },
                 {
-                    extend: 'print',
-                    title: '<?php echo trans('lang.assetactivity'); ?>',
-                    className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
-                    exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6, 7]
-
-                        
+                    className: 'btn btn-sm btn-fill btn-info ',
+                    action: function() {
+                        openActivityPdf();
                     }
                 }
             ]
+        });
+
+        function openActivityPdf() {
+            var params = $.param({
+                status: $("#statusfilter").val(),
+                asset_scope: $("#asset_scope").val(),
+                search: tabledata.search()
+            });
+            window.open("{{ url('/reports/assetactivity/print/asset-activity-report') }}?" + params, '_blank');
+        }
+
+        $('#form').on('submit', function(e) {
+            tabledata.draw();
+            e.preventDefault();
         });
 
     })(jQuery);

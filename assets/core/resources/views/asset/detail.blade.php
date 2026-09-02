@@ -594,6 +594,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     title: '<?php echo trans('lang.maintenance_list '); ?>',
                     orientation: 'landscape',
+                    customize: standardPdfForm,
                     exportOptions: {
                         columns: [1, 2, 3, 4, 5]
                     },
@@ -608,6 +609,7 @@
                     title: '<?php echo trans('lang.maintenance_list '); ?>',
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
+                    customize: standardPrintForm,
                     exportOptions: {
                         columns: [1, 2, 3, 4, 5]
                     }
@@ -679,6 +681,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     title: '<?php echo trans('lang.component_list'); ?>',
                     orientation: 'landscape',
+                    customize: standardPdfForm,
                     exportOptions: {
                         columns: [1, 2, 3, 4, 5]
                     },
@@ -693,6 +696,7 @@
                     title: '<?php echo trans('lang.component_list'); ?>',
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
+                    customize: standardPrintForm,
                     exportOptions: {
                         columns: [1, 2, 3, 4, 5]
                     }
@@ -702,7 +706,7 @@
 
 
         //history data
-        $('#datahistory').DataTable({
+        var historyTable = $('#datahistory').DataTable({
             ajax: {
                 url: "{{ url('historyassetbyid')}}",
                 type: "post",
@@ -764,38 +768,24 @@
                     }
                 },
                 {
-                    extend: 'pdf',
                     text: 'PDF <i class="fa fa-file-pdf-o"></i>',
                     className: 'btn btn-sm btn-fill btn-info ',
-                    title: '<?php echo trans('lang.history_list'); ?>',
-                    orientation: 'landscape',
-                    exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6]
-
-                    },
-                    customize: function(doc) {
-                        doc.styles.tableHeader.alignment = 'left';
-                        doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1)
-                            .join('*').split('');
+                    action: function() {
+                        var searchValue = historyTable.search() || '';
+                        var assetSlug = "{{ \Illuminate\Support\Str::slug($data->assetname ?? 'asset-history') }}";
+                        var url = "{{ url('assethistoryprint') }}/" + id + "/" + assetSlug + "?search=" + encodeURIComponent(searchValue);
+                        window.open(url, '_blank');
                     }
                 },
                 {
-                    extend: 'print',
-                    // customize: function (win) {
-                    //         $(win.document.body)
-                    //             .css('font-size', '10pt')
-                    //             .prepend(
-                    //                 '<img src="http://datatables.net/media/images/logo-fade.png" style="position:absolute; top:0; left:0;" />'
-                    //             );
-                    //         },
-                    title: 'History',
-                    className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
-                    exportOptions: {
-                        columns: [1, 2, 3, 4, 5, 6]
-
+                    className: 'btn btn-sm btn-fill btn-info ',
+                    action: function() {
+                        var searchValue = historyTable.search() || '';
+                        var assetSlug = "{{ \Illuminate\Support\Str::slug($data->assetname ?? 'asset-history') }}";
+                        var url = "{{ url('assethistoryprint') }}/" + id + "/" + assetSlug + "?search=" + encodeURIComponent(searchValue);
+                        window.open(url, '_blank');
                     }
-
                 }
             ],
             createdRow: function(row, data, dataIndex) {
@@ -860,6 +850,7 @@
                     className: 'btn btn-sm btn-fill btn-info ',
                     title: '<?php echo trans('lang.file_list '); ?>',
                     orientation: 'landscape',
+                    customize: standardPdfForm,
                     exportOptions: {
                         columns: [1, 2, 3]
                     },
@@ -874,6 +865,7 @@
                     title: '<?php echo trans('lang.file_list '); ?>',
                     className: 'btn btn-sm btn-fill btn-info ',
                     text: 'Print <i class="fa fa-print"></i>',
+                    customize: standardPrintForm,
                     exportOptions: {
                         columns: [1, 2, 3]
                     }

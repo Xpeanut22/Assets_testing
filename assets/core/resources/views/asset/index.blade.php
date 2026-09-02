@@ -1176,6 +1176,40 @@
         "use strict";
 
         var table = $('#data').DataTable({
+            dom: "<'row align-items-center mb-2'<'col-sm-6'B><'col-sm-6'f>>" +
+                "<'row'<'col-sm-12'tr>>" +
+                "<'row'<'col-sm-4'l><'col-sm-4'i><'col-sm-4'p>>",
+            buttons: [{
+                    extend: 'copy',
+                    text: 'Copy <i class="fa fa-files-o"></i>',
+                    className: 'btn btn-sm btn-fill btn-info ',
+                    exportOptions: {
+                        columns: [1, 2, 3]
+                    }
+                },
+                {
+                    extend: 'csv',
+                    text: 'CSV <i class="fa fa-file-excel-o"></i>',
+                    className: 'btn btn-sm btn-fill btn-info ',
+                    exportOptions: {
+                        columns: [1, 2, 3]
+                    }
+                },
+                {
+                    text: 'PDF <i class="fa fa-file-pdf-o"></i>',
+                    className: 'btn btn-sm btn-fill btn-info ',
+                    action: function() {
+                        window.open("{{ url('/assetlist/print') }}", '_blank');
+                    }
+                },
+                {
+                    text: 'Print <i class="fa fa-print"></i>',
+                    className: 'btn btn-sm btn-fill btn-info ',
+                    action: function() {
+                        window.open("{{ url('/assetlist/print') }}", '_blank');
+                    }
+                }
+            ],
             ajax: {
                 url: "{{ url('getGroupedAssets') }}",
 
@@ -1191,13 +1225,13 @@
                     title: 'Asset Name'
                 },
                 {
-                    data: 'all_tags',
-                    visible: false, // hide column
-                    searchable: true // but searchable
-                },
-                {
                     data: 'total',
                     title: 'Total Items'
+                },
+                {
+                    data: 'all_tags',
+                    visible: false,
+                    searchable: true
                 },
 
                 {
@@ -1207,6 +1241,18 @@
                 }
             ]
         });
+        function clearAssetTableSearch() {
+            if (table.search()) {
+                table.search('').draw();
+            }
+            $('#data_filter input')
+                .val('')
+                .attr('autocomplete', 'off')
+                .attr('name', 'asset_table_search_' + Date.now());
+        }
+        clearAssetTableSearch();
+        setTimeout(clearAssetTableSearch, 100);
+        setTimeout(clearAssetTableSearch, 500);
 
         $('#data tbody').on('click', '.btn-show', function() {
 
@@ -2099,13 +2145,31 @@
         var targetModalEvent = null;
         var eventHolder;
         var x;
+        var currentEditId = null;
+        var currentDeleteId = null;
+
+        function setEditSelectValue(selector, value, text) {
+            var $field = $(selector);
+            if (value === undefined || value === null || value === '') {
+                $field.val('').trigger('change');
+                return;
+            }
+
+            if (!$field.find('option[value="' + value + '"]').length) {
+                $field.append($('<option></option>')
+                    .attr('value', value)
+                    .text(text || value));
+            }
+
+            $field.val(value).trigger('change');
+        }
 
         function showEditModal() {
             showreference();
             // $("#edit").prop('class', 'modal fade');
-            if (targetModalEvent) {
+            if (currentEditId) {
                 var $modal = $('#edit'),
-                    id = $(targetModalEvent.relatedTarget).attr('customdata');
+                    id = currentEditId;
                 $.ajax({
                     type: "POST",
                     url: "{{ url('assetbyid') }}",
@@ -2114,37 +2178,44 @@
                     },
                     dataType: "JSON",
                     success: function(data) {
+                        if (!data || data.success === 'failed' || !data.message) {
+                            alert('Unable to load asset details.');
+                            return;
+                        }
                         $("#editid").val(id);
                         $("#editname").val(data.message.assetname);
-                        $('#editlocationid').val(data.message.locationid).trigger('change');
-                        $("#editsupplierid").val(data.message.supplierid);
-                        $('#editbrandid').val(data.message.brandid).trigger('change');
-                        $('#edittypeid').val(data.message.typeid).trigger('change');
+                        setEditSelectValue('#editlocationid', data.message.locationid, data.message.location);
+                        setEditSelectValue('#editsupplierid', data.message.supplierid, data.message.supplier);
+                        setEditSelectValue('#editbrandid', data.message.brandid, data.message.brand);
+                        setEditSelectValue('#edittypeid', data.message.typeid, data.message.type);
                         $("#editassettag").val(data.message.assettag);
                         // $("#editunit").val(parseInt(data.message.unit));
-                        $('#editunit').val(data.message.unit).trigger('change');
-                        $('#editcategory').val(data.message.category);
+                        setEditSelectValue('#editunit', data.message.unit);
+                        setEditSelectValue('#editcategory', data.message.category, data.message.categoryname);
                         $("#editquantity").val(data.message.quantity);
                         $("#editpurchasedate").val(data.message.purchasedate);
                         $("#editcost").val(data.message.cost);
                         $("#editwarranty").val(data.message.warranty);
-                        $("#editstatus").val(data.message.status);
-                        $("#editdescription").val(data.message.assetdescription);
+                        setEditSelectValue('#editstatus', data.message.status);
+                        $("#editdescription").val(data.message.assetdescription || data.message.description);
 
                         // $("#editunit", "#editcategory", "#edittypeid").change();
                     }
                 });
-                $('#edit').modal('show');
+                if (!$('#edit').hasClass('show')) {
+                    $('#edit').modal('show');
+                }
                 $("#editcontent").css('display', 'block');
                 targetModalEvent = null;
+                currentEditId = null;
             }
         }
 
         function showDeleteModal() {
             // $("#edit").prop('class', 'modal fade');
-            if (targetModalEvent) {
+            if (currentDeleteId) {
                 var $modal = $(this),
-                    id = $(targetModalEvent.relatedTarget).attr('customdata');
+                    id = currentDeleteId;
                 $("#iddelete").val(id);
                 $("#formdelete").validate({
                     submitHandler: function(form) {
@@ -2169,6 +2240,7 @@
                 $('#delete').modal('show');
                 $("#deletecontent").css('display', 'block');
                 targetModalEvent = null;
+                currentDeleteId = null;
             }
         }
 
@@ -2209,6 +2281,14 @@
             });
         }
 
+        $(document).on('click', '[data-target="#edit"][customdata]', function() {
+            currentEditId = $(this).attr('customdata');
+        });
+
+        $(document).on('click', '[data-target="#delete"][customdata]', function() {
+            currentDeleteId = $(this).attr('customdata');
+        });
+
         // $("#edit #delete").on('hide.bs.modal', function() {
         //     $("#editcontent").css('display', 'none');
         // });
@@ -2224,8 +2304,10 @@
             // $("#edit").css('display', 'none');
 
             targetModalEvent = e;
+            currentEditId = currentEditId || $(e.relatedTarget).attr('customdata');
             // $("#password").modal("show");
 
+            $("#editcontent").css('display', 'none');
             $(".passwordcontent").css('display', 'block');
         });
 
@@ -2240,6 +2322,7 @@
             // $("#edit").css('display', 'none');
 
             targetModalEvent = e;
+            currentDeleteId = currentDeleteId || $(e.relatedTarget).attr('customdata');
             // $("#password").modal("show");
             $(".passwordcontent1").css('display', 'block');
         });
@@ -2295,10 +2378,13 @@
                     })
                 })
                 .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Unable to prepare printout.');
+                    }
                     const disposition = response.headers.get('Content-Disposition');
                     let filename = 'asset_form.pdf';
                     if (disposition && disposition.indexOf('filename=') !== -1) {
-                        filename = disposition.split('filename=')[1].replace(/["']/g, '');
+                        filename = disposition.split('filename=')[1].replace(/["']/g, '').trim();
                     }
                     return response.blob().then(blob => ({
                         blob,
@@ -2310,16 +2396,36 @@
                     filename
                 }) => {
                     const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = url;
+                    downloadLink.download = filename;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    downloadLink.remove();
+
+                    const iframe = document.createElement('iframe');
+                    iframe.style.position = 'fixed';
+                    iframe.style.right = '0';
+                    iframe.style.bottom = '0';
+                    iframe.style.width = '0';
+                    iframe.style.height = '0';
+                    iframe.style.border = '0';
+                    iframe.src = url;
+                    iframe.onload = function() {
+                        setTimeout(function() {
+                            iframe.contentWindow.focus();
+                            iframe.contentWindow.print();
+                            setTimeout(function() {
+                                window.URL.revokeObjectURL(url);
+                                iframe.remove();
+                            }, 3000);
+                        }, 500);
+                    };
+                    document.body.appendChild(iframe);
                 })
                 .catch(error => {
-                    console.error('Error downloading PDF:', error);
+                    console.error('Error preparing printout:', error);
+                    alert('Unable to prepare printout.');
                 });
         }
 
@@ -2349,21 +2455,58 @@
         });
 
         $('#saveAllScans').on('click', function() {
-            const enrichedAssets = scannedAssets.map(asset => ({
-                ...asset,
-                // preserve the asset-specific control number already captured for returns
-                depid: $('#depid').val(),
-                condition: $('#core').val(),
-                used: $('#used').val(),
-                receivedby: loggedInUserId,
-                checkindate: $('#checkindate').val(),
-                remarks: $('#remarks').val(),
-                employeeid: $('#checkoutemployeeid1').val()
-            }));
             if (scannedAssets.length === 0) {
                 alert("No assets scanned.");
                 return;
             }
+
+            const $modal = $('#scanning');
+            const employeeid = $modal.find('#checkoutemployeeid1').val();
+            const depid = $modal.find('#depid').val();
+            const checkindate = $modal.find('#checkindate').val();
+            const condition = $modal.find('#core').val();
+            const used = $modal.find('#used').val();
+            const remarks = $modal.find('#remarks').val();
+            const controlno = $modal.find('#controlno').val();
+            const hasBorrowedItem = scannedAssets.some(asset => asset.checkstatus != 2);
+
+            if (!employeeid) {
+                alert("Please select borrower/returner name.");
+                return;
+            }
+            if (!depid) {
+                alert("Please select department / office representing.");
+                return;
+            }
+            if (!checkindate) {
+                alert("Please provide date.");
+                return;
+            }
+            if (!condition) {
+                alert("Please select condition of borrowed equipment.");
+                return;
+            }
+            if (!used) {
+                alert("Please select purpose of equipment.");
+                return;
+            }
+            if (hasBorrowedItem && !controlno) {
+                alert("Please provide control number.");
+                return;
+            }
+
+            const enrichedAssets = scannedAssets.map(asset => ({
+                ...asset,
+                controlno: asset.checkstatus == 2 ? (asset.last_control_number || asset.controlno || '') : controlno,
+                depid: depid,
+                condition: condition,
+                used: used,
+                receivedby: loggedInUserId,
+                checkindate: checkindate,
+                remarks: remarks,
+                employeeid: employeeid
+            }));
+
             $.ajax({
                 url: "{{ url('savescanbatch') }}",
                 method: 'POST',
@@ -2372,24 +2515,50 @@
                     assets: enrichedAssets
                 }),
                 success: function(response) {
-                    fetchAssetPrintForm(response.id);
+                    $('#scanning').modal('hide');
+                    // Wait for modal to fully close and show next tab, then open PDF
+                    window.setTimeout(function() {
+                        window.open("{{ url('assetprintform') }}/" + response.id, '_blank');
+                    }, 500);
                     window.setTimeout(function() {
                         location.reload()
                     }, 2000)
 
-                    // console.log(response);
-                    // alert('Saved ' + response.saved + ' out of ' + response.total + ' assets.');
-
                 },
                 error: function(xhr) {
                     console.error(xhr.responseText);
-                    alert('Error occurred while saving scanned items.');
+                    let message = 'Error occurred while saving scanned items.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    } else if (xhr.responseText) {
+                        message = xhr.responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    }
+                    alert(message);
                 }
             });
 
 
         });
 
+
+        function openPreparedAssetPrintout(printWindow, printUrl) {
+            if (!printUrl) {
+                if (printWindow) {
+                    printWindow.close();
+                }
+                return;
+            }
+
+            if (printWindow && !printWindow.closed) {
+                printWindow.location.href = printUrl;
+                return;
+            }
+
+            var fallbackWindow = window.open(printUrl, '_blank');
+            if (!fallbackWindow) {
+                alert('Borrowed/return form was saved. Please allow pop-ups, then open the printout again.');
+            }
+        }
 
         //checkout
         $("#formcheckout").validate({
@@ -2404,9 +2573,16 @@
                             'display': "block"
                         });
                         $('#checkout').modal('hide');
+                        // Wait for modal to fully close, then open PDF
+                        window.setTimeout(function() {
+                            window.open(data.print_url, '_blank');
+                        }, 500);
                         window.setTimeout(function() {
                             location.reload()
                         }, 2000)
+                    },
+                    error: function() {
+                        alert('Failed to save checkout. Please try again.');
                     }
                 });
             }
@@ -2426,9 +2602,16 @@
                             'display': "block"
                         });
                         $('#checkin').modal('hide');
+                        // Wait for modal to fully close, then open PDF
+                        window.setTimeout(function() {
+                            window.open(data.print_url, '_blank');
+                        }, 500);
                         window.setTimeout(function() {
                             location.reload()
                         }, 2000)
+                    },
+                    error: function() {
+                        alert('Failed to save checkin. Please try again.');
                     }
                 });
             }
@@ -2459,34 +2642,34 @@
             var $modal = $(this),
                 id = $(e.relatedTarget).attr('customdata');
             $.ajax({
-                type: "POST",
-                url: "{{ url('assetbyid')}}",
-                data: {
-                    id: id
+                url: "{{ url('savescanbatch') }}",
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    assets: enrichedAssets
+                }),
+                success: function(response) {
+                    $('#scanning').modal('hide');
+                    // Wait for modal to fully close and show next tab, then open PDF
+                    window.setTimeout(function() {
+                        window.open("{{ url('assetprintform') }}/" + response.id, '_blank');
+                    }, 500);
+                    window.setTimeout(function() {
+                        location.reload()
+                    }, 2000)
+
                 },
-                dataType: "JSON",
-                success: function(data) {
-                    $modal.find("#checkinassetid").val(id);
-                    $modal.find("#checkinname").val(data.message.name);
-                    $modal.find("#checkinassettag").val(data.message.assettag);
-                    $modal.find("#controlno1").val(data.message.last_control_number || '');
+                error: function(xhr) {
+                    console.error(xhr.responseText);
+                    let message = 'Error occurred while saving scanned items.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    } else if (xhr.responseText) {
+                        message = xhr.responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    }
+                    alert(message);
                 }
             });
-        });
-
-        // $('#scandata').on('show.bs.modal', function(e) {
-        //     //   $("#checkdata").Remove();
-        //     showreference();
-
-        // });
-
-        $("#add").on('show.bs.modal', function(e) {
-            showreference();
-        });
-        $("#scanning").on('show.bs.modal', function(e) {
-            showreference();
-            generateControl();
-        });
 
         $('#scanning').on('hidden.bs.modal', function() {
             $("#checkdata").hide();

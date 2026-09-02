@@ -97,7 +97,7 @@
                 <h3 class=""><?php echo trans('lang.issuelist'); ?></h3>
             </div>
             <div class="col-md-6 text-md-right pb-md-0 pb-3">
-                <button type="button" data-toggle="modal" data-target="#batchscanning" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i>Scan Issue</button>
+                <button type="button" id="openScanIssue" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i>Scan Issue</button>
                 <!-- <button type="button" data-toggle="modal" data-target="#batchcheckout" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i>Batch Issuance</button> -->
                 <button type="button" data-toggle="modal" data-target="#add" class="btn btn-sm btn-fill btn-primary"><i class="fa fa-plus"></i> <?php echo trans('lang.add_data'); ?></button>
             </div>
@@ -609,7 +609,7 @@
 
 
                     <div class="modal-header">
-                        <h5 class="modal-title"><?php echo trans('lang.scan_data'); ?> (Batch)</h5>
+                        <h5 class="modal-title">Scan Issue</h5>
                         <button type="button" class="reloaddata ml-3 badge badge-data text-white background-green">
                             Reload
                         </button>
@@ -637,7 +637,7 @@
                             </div>
                         </div>
 
-                <form action="#" id="batchformscanning" enctype="multipart/form-data" autocomplete="off">
+                <form action="#" id="batchformscanning" enctype="multipart/form-data" autocomplete="off" onsubmit="saveBatchIssuance(event); return false;">
 
 
                         <!-- SCANNED LIST TABLE -->
@@ -758,10 +758,11 @@
                     </div>
 
                     <div class="modal-footer">
-                        <button type="submit"
+                        <button type="button"
                             class="btn btn-success"
-                            id="saveBatchScanning">
-                            Save All Scans
+                            id="saveBatchScanning"
+                            onclick="saveBatchIssuance(event)">
+                            Save Issuance
                         </button>
 
                         <button type="button"
@@ -1013,15 +1014,22 @@
             remainingQty = 0;
         }
 
-        if (checkstatus == 2 && remainingQty <= 0) {
-            return "<span class='badge badge-data text-white background-red'>Issued</span>";
+        return "<span class='badge badge-data text-white background-green'>Remaining: " + remainingQty + "</span>";
+    }
+
+    function issuedquantity(quantity, totalQuantity) {
+        var remainingQty = parseInt(quantity, 10);
+        var totalQty = parseInt(totalQuantity, 10);
+        if (isNaN(remainingQty)) {
+            remainingQty = 0;
+        }
+        if (isNaN(totalQty)) {
+            totalQty = 0;
         }
 
-        if (remainingQty > 0) {
-            return "<span class='badge badge-data text-white background-green'>Remaining: " + remainingQty + "</span>";
-        }
+        var issuedQty = Math.max(0, totalQty - remainingQty);
 
-        return "<span class='badge badge-data text-white background-red'>Issued</span>";
+        return "<span class='badge badge-data text-white background-red'>Issued: " + issuedQty + "</span>";
     }
 
     function controlnumber(control_number) {
@@ -1056,25 +1064,26 @@
         });
 
         var loggedInUserId = "{{ Auth::user()->fullname }}";
+        function getFormattedDateTime() {
+            var today = new Date();
+            var day = String(today.getDate()).padStart(2, '0');
+            var month = String(today.getMonth() + 1).padStart(2, '0');
+            var year = today.getFullYear();
+            var hours = String(today.getHours()).padStart(2, '0');
+            var minutes = String(today.getMinutes()).padStart(2, '0');
+
+            return year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
+        }
 
         $(document).ready(function() {
 
 
-            var today = new Date();
-
-            var day = String(today.getDate()).padStart(2, '0');
-            var month = String(today.getMonth() + 1).padStart(2, '0');
-            var year = today.getFullYear();
-
-            var hours = String(today.getHours()).padStart(2, '0');
-            var minutes = String(today.getMinutes()).padStart(2, '0');
-            var seconds = String(today.getSeconds()).padStart(2, '0');
-
-            var formattedDateTime = year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+            var formattedDateTime = getFormattedDateTime();
 
             // Set the value of the checkindate input field
             $('#checkoutdate1').val(formattedDateTime);
             $('#checkoutdate2').val(formattedDateTime);
+            $('#batchscanning #checkindate').val(getFormattedDateTime());
 
             $('.select2').on('select2:select', function(e) {
                 var selectedValue = e.params.data.id;
@@ -1100,10 +1109,19 @@
                 } else if (selectedValue === 'checkoutemployeeid1') {
                     var url = "{{ URL::to('employeeslist') }}";
                     window.open(url, '_blank');
+                } else if (selectedValue === 'depid') {
+                    var url = "{{ URL::to('departmentlist') }}";
+                    window.open(url, '_blank');
                 }
 
             });
 
+            $('#batchscanning select[name="checkoutemployeeid1"]').on('change', function() {
+                if ($(this).val() === 'checkoutemployeeid1') {
+                    window.open("{{ URL::to('employeeslist') }}", '_blank');
+                    $(this).val('');
+                }
+            });
 
         });
 
@@ -1121,6 +1139,76 @@
                     }
                 }
             });
+        }
+
+        function resetSelectOptions($select, placeholder) {
+            $select.empty().append($("<option></option>").attr("value", "").text(placeholder || ""));
+        }
+
+        function loadScanIssueReferences() {
+            const $modal = $('#batchscanning');
+            const $issuedTo = $modal.find('select[name="checkoutemployeeid1"]');
+            const $department = $modal.find('select[name="depid"]');
+
+            resetSelectOptions($issuedTo, "<?php echo trans('lang.issueto'); ?>");
+            resetSelectOptions($department, "");
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listemployees') }}",
+                dataType: "JSON",
+                success: function(html) {
+                    const employees = html.message || [];
+                    jQuery.each(employees, function(index, record) {
+                        $issuedTo.append($("<option></option>")
+                            .attr("value", decodeURIComponent(record.id))
+                            .text(decodeURIComponent(record.fullname)));
+                    });
+                    $issuedTo.append($("<option></option>")
+                        .attr("value", "checkoutemployeeid1")
+                        .text("Add New Data"));
+                }
+            });
+
+            $.ajax({
+                type: "GET",
+                url: "{{ url('listdepartment') }}",
+                dataType: "JSON",
+                success: function(html) {
+                    const departments = html.message || [];
+                    jQuery.each(departments, function(index, record) {
+                        $department.append($("<option></option>")
+                            .attr("value", decodeURIComponent(record.id))
+                            .text(decodeURIComponent(record.name)));
+                    });
+                    $department.append($("<option></option>")
+                        .attr("value", "depid")
+                        .text("Add New Data"));
+
+                    if ($department.data('select2')) {
+                        $department.select2('destroy');
+                    }
+                    $department.select2({
+                        dropdownParent: $modal,
+                        width: 'resolve'
+                    });
+                }
+            });
+        }
+
+        function showIssuancePrintLinks(printUrl, pdfUrl) {
+            if (!printUrl) {
+                return;
+            }
+
+            const downloadUrl = pdfUrl || (printUrl + (printUrl.indexOf('?') === -1 ? '?' : '&') + 'download=1');
+            $('#issuancePrintLinks').remove();
+            $('#batchscanning .modal-footer').prepend(
+                '<div id="issuancePrintLinks" class="mr-auto">' +
+                    '<a class="btn btn-sm btn-primary mr-2" href="' + printUrl + '" target="_blank">Open Printout</a>' +
+                    '<a class="btn btn-sm btn-success" href="' + downloadUrl + '" target="_blank">Download PDF</a>' +
+                '</div>'
+            );
         }
 
 
@@ -1156,6 +1244,16 @@
             ],
             buttons: []
         });
+        function clearIssuanceTableSearch() {
+            table.search('').draw();
+            $('#data_filter input')
+                .val('')
+                .attr('autocomplete', 'off')
+                .attr('name', 'issuance_table_search_' + Date.now());
+        }
+        clearIssuanceTableSearch();
+        setTimeout(clearIssuanceTableSearch, 100);
+        setTimeout(clearIssuanceTableSearch, 500);
 
         $('#data tbody').on('click', '.btn-show-component', function() {
             var tr = $(this).closest('tr');
@@ -1176,6 +1274,7 @@
                     html += '<th>Type</th>';
                     html += '<th>Quantity</th>';
                     html += '<th>Available Quantity</th>';
+                    html += '<th>Issued Quantity</th>';
                     html += '<th>Control No.</th>';
                     html += '<th>Issue Type</th>';
                     html += '<th>Action</th>';
@@ -1190,6 +1289,7 @@
                         html += '<td>' + (item.type ?? '-') + '</td>';
                         html += '<td>' + (item.quantity ?? '-') + '</td>';
                         html += '<td>' + zeroquantity(item.caquantity, item.checkstatus) + '</td>';
+                        html += '<td>' + issuedquantity(item.caquantity, item.quantity) + '</td>';
                         html += '<td>' + (item.control_number ?? '-') + '</td>';
                         html += '<td>' + issuetype(item.issuancetype ?? '-') + '</td>';
                         html += '<td>' + item.action + '</td>';
@@ -1684,13 +1784,31 @@
         var targetModalEvent = null;
         var eventHolder;
         var x;
+        var currentEditId = null;
+        var currentDeleteId = null;
+
+        function setEditSelectValue(selector, value, text) {
+            var $field = $(selector);
+            if (value === undefined || value === null || value === '') {
+                $field.val('').trigger('change');
+                return;
+            }
+
+            if (!$field.find('option[value="' + value + '"]').length) {
+                $field.append($('<option></option>')
+                    .attr('value', value)
+                    .text(text || value));
+            }
+
+            $field.val(value).trigger('change');
+        }
 
         function showEditModal() {
             showreference();
             // $("#edit").prop('class', 'modal fade');
-            if (targetModalEvent) {
+            if (currentEditId) {
                 var $modal = $('#edit'),
-                    id = $(targetModalEvent.relatedTarget).attr('customdata');
+                    id = currentEditId;
                 $.ajax({
                     type: "POST",
                     url: "{{ url('componentbyid') }}",
@@ -1699,33 +1817,40 @@
                     },
                     dataType: "JSON",
                     success: function(data) {
+                        if (!data || data.success === 'failed' || !data.message) {
+                            alert('Unable to load item details.');
+                            return;
+                        }
                         $("#editid").val(id);
                         $("#editname").val(data.message.componentname);
-                        $("#editlocationid").val(data.message.locationid);
-                        $("#editsupplierid").val(data.message.supplierid);
-                        $("#editbrandid").val(data.message.brandid);
-                        $("#edittypeid").val(data.message.typeid);
+                        setEditSelectValue('#editlocationid', data.message.locationid, data.message.location);
+                        setEditSelectValue('#editsupplierid', data.message.supplierid, data.message.supplier);
+                        setEditSelectValue('#editbrandid', data.message.brandid, data.message.brand);
+                        setEditSelectValue('#edittypeid', data.message.typeid, data.message.type);
                         $("#editserial").val(data.message.serial);
                         $("#editquantity").val(data.message.quantity);
                         $("#editpurchasedate").val(data.message.purchasedate);
                         // $("#editcost").val(data.message.cost);
-                        $("#editunit").val(data.message.unit);
+                        setEditSelectValue('#editunit', data.message.unit);
                         $("#editwarranty").val(data.message.warranty);
-                        $("#editstatus").val(data.message.status);
+                        setEditSelectValue('#editstatus', data.message.status);
                         $("#editdescription").val(data.message.componentdescription);
                     }
                 });
-                $('#edit').modal('show');
+                if (!$('#edit').hasClass('show')) {
+                    $('#edit').modal('show');
+                }
                 $("#editcontent").css('display', 'block');
                 targetModalEvent = null;
+                currentEditId = null;
             }
         }
 
         function showDeleteModal() {
             // $("#edit").prop('class', 'modal fade');
-            if (targetModalEvent) {
+            if (currentDeleteId) {
                 var $modal = $(this),
-                    id = $(targetModalEvent.relatedTarget).attr('customdata');
+                    id = currentDeleteId;
                 $("#iddelete").val(id);
                 $("#formdelete").validate({
                     submitHandler: function(form) {
@@ -1751,6 +1876,7 @@
                 $('#delete').modal('show');
                 $("#deletecontent").css('display', 'block');
                 targetModalEvent = null;
+                currentDeleteId = null;
             }
         }
 
@@ -1791,6 +1917,14 @@
             });
         }
 
+        $(document).on('click', '[data-target="#edit"][customdata]', function() {
+            currentEditId = $(this).attr('customdata');
+        });
+
+        $(document).on('click', '[data-target="#delete"][customdata]', function() {
+            currentDeleteId = $(this).attr('customdata');
+        });
+
         $("#edit #delete").on('hide.bs.modal', function() {
             $("#editcontent").css('display', 'none');
         });
@@ -1806,7 +1940,9 @@
             // $("#edit").css('display', 'none');
 
             targetModalEvent = e;
+            currentEditId = currentEditId || $(e.relatedTarget).attr('customdata');
             // $("#password").modal("show");
+            $("#editcontent").css('display', 'none');
             $(".passwordcontent").css('display', 'block');
         });
 
@@ -1819,6 +1955,7 @@
             // $("#edit").css('display', 'none');
 
             targetModalEvent = e;
+            currentDeleteId = currentDeleteId || $(e.relatedTarget).attr('customdata');
             // $("#password").modal("show");
             $(".passwordcontent1").css('display', 'block');
         });
@@ -1839,9 +1976,39 @@
         $("#add").on('show.bs.modal', function(e) {
             showreference();
         });
+
+        let scannedComponents = [];
+        let batchScanSearchTimer = null;
+        let isBatchLookupInFlight = false;
+        let hasScanIssueDraft = false;
+
+        function prepareScanIssueModal() {
+            $('#scansearchbatch').val('');
+            $('#issuancePrintLinks').remove();
+            if (!hasScanIssueDraft) {
+                scannedComponents = [];
+                $('#scannedBatchTable tbody').empty();
+                const batchForm = $('#batchformscanning')[0];
+                if (batchForm) {
+                    batchForm.reset();
+                }
+                $('#batchscanning #checkindate').val(getFormattedDateTime());
+                generateBatchControlNumber();
+            }
+            loadScanIssueReferences();
+        }
+
         $("#batchscanning").on('show.bs.modal', function(e) {
-            showreference();
-            generateBatchControlNumber();
+            try {
+                prepareScanIssueModal();
+            } catch (error) {
+                console.error('Scan Issue modal setup failed:', error);
+            }
+        });
+
+        $('#openScanIssue').on('click', function(e) {
+            e.preventDefault();
+            $('#batchscanning').modal('show');
         });
 
 
@@ -2047,10 +2214,6 @@
                 id = $(e.relatedTarget).attr('customdata');
             $("#iddelete").val(id);
         });
-        let scannedComponents = [];
-        let batchScanSearchTimer = null;
-        let isBatchLookupInFlight = false;
-
         function resolveAvailableQuantity(data) {
             const messageData = data && data.message ? data.message : {};
             const fromMessageQty = parseInt(messageData.quantity, 10);
@@ -2112,8 +2275,9 @@
                         scannedComponents.push({
                             ...data.message,
                             available_quantity: dbQuantity,
-                            requested_quantity: 1
+                            requested_quantity: ''
                         });
+                        hasScanIssueDraft = true;
 
                         $('#scannedBatchTable tbody').append(`
                         <tr data-id="${assetId}">
@@ -2126,8 +2290,8 @@
                                     data-serial="${assetId}"
                                     min="1"
                                     max="${dbQuantity}"
-                                    value="1"
-                                    ${isEditableQuantity ? '' : 'readonly'}
+                                    value=""
+                                    placeholder="Qty"
                                 >
                             </td>
                             <td>
@@ -2146,6 +2310,16 @@
                             alert("Component not available.");
                         }
                     }
+                },
+                error: function(xhr) {
+                    let message = "Unable to scan item. Please try again.";
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    } else if (xhr.responseText) {
+                        message = xhr.responseText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    }
+                    alert(message);
+                    $('#scansearchbatch').focus();
                 },
                 complete: function() {
                     isBatchLookupInFlight = false;
@@ -2174,6 +2348,13 @@
             }, 250);
         });
 
+        $('#scansearchbatch').on('change blur', function() {
+            if (batchScanSearchTimer) {
+                clearTimeout(batchScanSearchTimer);
+            }
+            runBatchComponentLookup(false);
+        });
+
         $(document).on('click', '.remove-scan', function() {
 
             let row = $(this).closest('tr');
@@ -2182,6 +2363,7 @@
             scannedComponents = scannedComponents.filter(item =>
                 item.serial !== serial
             );
+            hasScanIssueDraft = scannedComponents.length > 0;
 
             row.remove();
         });
@@ -2192,8 +2374,19 @@
             const maxQty = parseInt($input.attr('max'), 10) || 1;
             let requestedQty = parseInt($input.val(), 10);
 
+            if ($input.val().trim() === '') {
+                scannedComponents = scannedComponents.map(item =>
+                    item.serial === serial ? {
+                        ...item,
+                        requested_quantity: ''
+                    } : item
+                );
+                hasScanIssueDraft = true;
+                return;
+            }
+
             if (Number.isNaN(requestedQty) || requestedQty < 1) {
-                requestedQty = 1;
+                requestedQty = '';
             } else if (requestedQty > maxQty) {
                 requestedQty = maxQty;
             }
@@ -2206,22 +2399,66 @@
                     requested_quantity: requestedQty
                 } : item
             );
+            hasScanIssueDraft = true;
         });
 
-$('#batchformscanning').on('submit', function(e) {
-    e.preventDefault();
+        $('#batchformscanning').on('change input', 'input, select, textarea', function() {
+            hasScanIssueDraft = true;
+        });
+
+window.saveBatchIssuance = function(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    if (window.issuanceSaveInProgress) {
+        return;
+    }
 
     if (scannedComponents.length === 0) {
         alert("No components scanned.");
         return;
     }
 
-    let formData = $(this).serializeArray();
+    let formData = $('#batchformscanning').serializeArray();
 
     let dataObject = {};
     formData.forEach(function(field) {
         dataObject[field.name] = field.value;
     });
+
+    const requiredFields = [{
+            selector: '#checkoutemployeeid1',
+            message: 'Please select Issued to.'
+        },
+        {
+            selector: '#depid',
+            message: 'Please select Department / Office Representing.'
+        },
+        {
+            selector: '#core',
+            message: 'Please select Condition of Equipment.'
+        },
+        {
+            selector: '#issuancetype1',
+            message: 'Please select Issuance Type.'
+        }
+    ];
+    const missingFields = [];
+    requiredFields.forEach(function(field) {
+        const $field = $(field.selector);
+        if (!$field.val()) {
+            $field.addClass('is-invalid');
+            missingFields.push(field.message);
+        } else {
+            $field.removeClass('is-invalid');
+        }
+    });
+    if (missingFields.length > 0) {
+        alert(missingFields.join("\n"));
+        return;
+    }
 
     const qtyErrors = [];
     $('#scannedBatchTable tbody tr').each(function() {
@@ -2256,9 +2493,43 @@ $('#batchformscanning').on('submit', function(e) {
     dataObject.components = scannedComponents.map(item => ({
         ...item,
         available_quantity: item.available_quantity || (parseInt(item.quantity, 10) || 1),
-        issue_quantity: item.requested_quantity || 1,
-        quantity: item.requested_quantity || 1
+        issue_quantity: item.requested_quantity,
+        quantity: item.requested_quantity
     }));
+
+    const issuedToText = $('#checkoutemployeeid1 option:selected').text().trim() || '-';
+    const officeText = $('#depid option:selected').text().trim() || '-';
+    const conditionText = $('#core option:selected').text().trim() || '-';
+    const controlNumberText = $('#controlno_batch').val() || '-';
+    const remarksText = $('#remarks').val().trim() || '-';
+    const itemSummary = dataObject.components.map(item =>
+        `Serial: ${item.serial || '-'}\nItem: ${item.name || '-'}\nQuantity: ${item.quantity}`
+    ).join("\n\n");
+
+    const confirmMessage =
+        "Please confirm issuance details:\n\n" +
+        "Issued to: " + issuedToText + "\n" +
+        "Office: " + officeText + "\n" +
+        "Control Number: " + controlNumberText + "\n" +
+        "Condition: " + conditionText + "\n" +
+        "Remarks: " + remarksText + "\n\n" +
+        "Items:\n" + itemSummary + "\n\n" +
+        "Are all details correct?";
+
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+
+    const printWindow = window.open('about:blank', '_blank');
+    if (!printWindow) {
+        alert("Please allow pop-ups for localhost so the issuance PDF can open in a new tab.");
+        return;
+    }
+    printWindow.document.open();
+    printWindow.document.write('<p style="font-family: Arial; padding: 16px;">Preparing issuance form...</p>');
+    printWindow.document.close();
+
+    window.issuanceSaveInProgress = true;
 
     $.ajax({
         type: "POST",
@@ -2266,22 +2537,63 @@ $('#batchformscanning').on('submit', function(e) {
         data: dataObject,
         success: function(response) {
             if (response && response.success && response.print_url) {
-                window.open(response.print_url, '_blank');
+                showIssuancePrintLinks(response.print_url, response.pdf_url);
+                const downloadUrl = response.pdf_url || (response.print_url + (response.print_url.indexOf('?') === -1 ? '?' : '&') + 'download=1');
+
+                if (printWindow) {
+                    printWindow.location.href = response.print_url;
+                    printWindow.focus();
+                } else {
+                    const fallbackPrintWindow = window.open(response.print_url, '_blank');
+                    if (fallbackPrintWindow) {
+                        fallbackPrintWindow.focus();
+                    } else {
+                        alert("Issuance was saved. Please allow pop-ups or use the Open Printout button below.");
+                    }
+                }
+
+                setTimeout(function() {
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = downloadUrl;
+                    downloadLink.target = '_self';
+                    downloadLink.style.display = 'none';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    setTimeout(function() {
+                        downloadLink.remove();
+                    }, 5000);
+                }, 800);
+            } else if (printWindow) {
+                printWindow.close();
             }
-            alert("Batch Issued Successfully");
 
             scannedComponents = [];
+            hasScanIssueDraft = false;
             $('#scannedBatchTable tbody').empty();
             $('#batchformscanning')[0].reset();
+            $('#batchscanning').modal('hide');
+            $('#issuancePrintLinks').remove();
+            if (typeof table !== 'undefined') {
+                table.ajax.reload(null, false);
+            }
+            window.issuanceSaveInProgress = false;
         },
         error: function(xhr) {
+            if (printWindow) {
+                printWindow.close();
+            }
             var message = "Failed to save batch issuance.";
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 message = xhr.responseJSON.message;
             }
             alert(message);
+            window.issuanceSaveInProgress = false;
         }
     });
+};
+
+$(document).off('click', '#saveBatchScanning').on('click', '#saveBatchScanning', function(e) {
+    window.saveBatchIssuance(e);
 });
 
     })(jQuery);
