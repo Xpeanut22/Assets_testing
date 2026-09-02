@@ -132,11 +132,12 @@ class Home extends Controller
 	 */
     public function recentcomponentactivity(){
         $data = DB::table('component_assets')
-        ->select('component_assets.*', 'component.serial as cserial', 'receiver.fullname as rfullname', 'component_assets.control_number as ccontrolno', 'component.name as component', 'employees.fullname as employees','employees.mobile_number', 'employees.departmentid as deparmentid', 'department.description as departmentname' ,'assets.name as asset', 'asset_type.name as type', 'location.name as location')
+        ->select('component_assets.*', 'component.serial as cserial', 'receiver.fullname as rfullname', 'component_assets.control_number as ccontrolno', 'component.name as component', 'employees.fullname as employees','employees.mobile_number', 'employees.departmentid as deparmentid', DB::raw("COALESCE(issue_department.name, issue_department.description, NULLIF(CAST(component_assets.department AS CHAR), ''), employee_department.name, employee_department.description) as departmentname") ,'assets.name as asset', 'asset_type.name as type', 'location.name as location')
         ->leftJoin('assets', 'assets.id', '=', 'component_assets.assetid')
         ->leftJoin('asset_type', 'assets.typeid', '=', 'asset_type.id')
 		->leftJoin('employees', 'employees.id', '=', 'component_assets.employeeid')
-		->leftJoin('department', 'department.id', '=', 'employees.departmentid')
+		->leftJoin('department as employee_department', 'employee_department.id', '=', 'employees.departmentid')
+		->leftJoin('department as issue_department', 'issue_department.id', '=', 'component_assets.department')
         ->leftJoin('location', 'location.id', '=', 'assets.locationid')
         ->leftJoin('component', 'component.id', '=', 'component_assets.componentid')
         ->leftJoin('receiver', 'receiver.id', '=', 'component_assets.created_by')
